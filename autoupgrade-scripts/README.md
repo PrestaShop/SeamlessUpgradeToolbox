@@ -1,4 +1,4 @@
-# Utility script to quickly test the autoupgade module
+# Utility script to quickly test the autoupgrade module
 
 The script allows testing the upgrade between 2 versions of PrestaShop, with the possibility of obtaining a
 database dump and comparing it with a dump from a fresh install.
