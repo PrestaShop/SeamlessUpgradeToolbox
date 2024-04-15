@@ -209,9 +209,9 @@ dump_DB() {
   echo "--- Create dump for $1 ---"
   version="${1//./}"
    if [[ -n "$2" ]]; then
-      docker compose run --rm mysql sh -c "exec mysqldump -hmysql -uroot --no-data -p$MYSQL_ROOT_PASSWORD presta_$version" >"$DUMP_DIRECTORY"/"$1"_to_"$2"_dump_.sql
+      docker compose run --rm mysql sh -c "exec mysqldump -hmysql -uroot --no-data --compact -p$MYSQL_ROOT_PASSWORD presta_$version" | sed 's/ AUTO_INCREMENT=[0-9]*\b//g' >"$DUMP_DIRECTORY"/"$1"_to_"$2"_dump_.sql
    else
-      docker compose run --rm mysql sh -c "exec mysqldump -hmysql -uroot --no-data -p$MYSQL_ROOT_PASSWORD presta_$version" >"$DUMP_DIRECTORY"/"$1"_dump_.sql
+      docker compose run --rm mysql sh -c "exec mysqldump -hmysql -uroot --no-data --compact -p$MYSQL_ROOT_PASSWORD presta_$version" | sed 's/ AUTO_INCREMENT=[0-9]*\b//g' >"$DUMP_DIRECTORY"/"$1"_dump_.sql
    fi
   echo "--- Create dump for $1 done ---"
   echo ""
