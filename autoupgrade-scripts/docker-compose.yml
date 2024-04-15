@@ -31,3 +31,17 @@ services:
         image: composer:latest
         volumes:
             - ./:/var/www/html/
+
+    visualize-diff-front:
+        build:
+            dockerfile: ../../SeamlessUpgradeToolbox/autoupgrade-scripts/visualize-diff-front.DockerFile
+        ports:
+            - "8080:80"
+
+    visualize-diff-back:
+        build:
+            dockerfile: ../../SeamlessUpgradeToolbox/autoupgrade-scripts/visualize-diff-back.DockerFile
+        ports:
+            - "3000:3000"
+        volumes:
+            - ./dumps:/dumps
