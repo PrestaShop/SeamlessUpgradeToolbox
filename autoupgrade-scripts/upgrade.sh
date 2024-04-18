@@ -12,9 +12,9 @@ mkdir -p "$DUMP_DIRECTORY"
 mkdir -p "$LOGS_DIRECTORY"
 
 # Remove previous executions
-rm -rf ./logs/*
-rm -rf ./releases/*
-rm -rf ./dumps/*
+rm -rf ./"$LOGS_DIRECTORY"/*
+rm -rf ./"$RELEASE_DIRECTORY"/*
+rm -rf ./"$DUMP_DIRECTORY"/*
 
 docker compose down --volumes --remove-orphans
 
@@ -29,8 +29,13 @@ fi
 install() {
   echo "--- Installation of v$1 ---"
   db_version="${1//./}"
+    if [[ "$PERFORM_ONLY_CORE_DATABASE_UPGRADE" == true ]]; then
+      presta_step=database
+    else
+      presta_step=all
+    fi
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$1" work-base php install/index_cli.php \
-    --step=all --db_server=mysql:3306 --db_name=presta_"$db_version" --db_DOCKER_USER_ID=root --db_password="$MYSQL_ROOT_PASSWORD" --prefix=ps_ --db_clear=1 \
+    --step="$presta_step" --db_server=mysql:3306 --db_name=presta_"$db_version" --db_DOCKER_USER_ID=root --db_password="$MYSQL_ROOT_PASSWORD" --prefix=ps_ --db_clear=1 \
     --domain=localhost:8002 --firstname="Marc" --lastname="Beier" \
     --password=Toto123! --email=demo@prestashop.com --language=fr --country=fr \
     --newsletter=0 --send_email=0 --ssl=0 >"$LOGS_DIRECTORY"/"$1"_install
@@ -48,10 +53,10 @@ install() {
 download_release_and_xml() {
   echo "--- Download v$1 Prestashop release and xml MD5 ---"
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-    curl --fail -L https://github.com/PrestaShop/PrestaShop/releases/download/"$1"/prestashop_"$1".zip -o admin/autoupgrade/download/prestashop_"$1".zip
+    curl --fail -L https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip -o admin/autoupgrade/download/prestashop_"$1".zip
 
   if [ ! $? -eq 0 ]; then
-    echo "Download v$1 Prestashop release zip fail, see" https://github.com/PrestaShop/PrestaShop/releases/download/"$1"/prestashop_"$1".zip
+    echo "Download v$1 Prestashop release zip fail, see" https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip
     exit 1
   fi
 
@@ -89,7 +94,7 @@ clean_modules() {
 }
 
 upgrade() {
-  if [[ "$CLEAN_MODULES_BEFORE_UPGRADE" == true ]]; then
+  if [[ "$PERFORM_ONLY_CORE_DATABASE_UPGRADE" == true ]]; then
     clean_modules
   fi
 
@@ -98,7 +103,7 @@ upgrade() {
 }
 
 upgrade_experimental() {
-  if [[ "$CLEAN_MODULES_BEFORE_UPGRADE" == true ]]; then
+  if [[ "$PERFORM_ONLY_CORE_DATABASE_UPGRADE" == true ]]; then
       clean_modules
   fi
 
@@ -140,16 +145,17 @@ download_release() {
   echo "--- Download v$1 Prestashop release ---"
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ work-base /bin/sh -c \
     "cd $RELEASE_DIRECTORY || exit
-     curl --fail -LO https://github.com/PrestaShop/PrestaShop/releases/download/$1/prestashop_$1.zip;
+     curl --fail -LO https://github.com/PrestaShop/zip-archives/raw/main/prestashop_$1.zip;
      unzip -o prestashop_$1.zip -d $1 >/dev/null;
      rm prestashop_$1.zip;
      cd $1 || exit;
      unzip -o prestashop.zip >/dev/null;
      rm prestashop.zip;
-     mkdir admin/autoupgrade/download;"
+     mkdir admin/autoupgrade/download;
+     cp -r ../$1 ../$1_base;"
 
   if [ ! $? -eq 0 ]; then
-    echo "Download v$1 Prestashop release zip fail, see" https://github.com/PrestaShop/PrestaShop/releases/download/"$1"/prestashop_"$1".zip
+    echo "Download v$1 Prestashop release zip fail, see" https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip
     exit 1
   fi
 
@@ -281,6 +287,8 @@ if dpkg --compare-versions "$UPGRADE_VERSION" ge 9.0.0; then
 else
   docker compose build prestashop-run
 fi
+
+mv "$RELEASE_DIRECTORY"/"$BASE_VERSION" "$RELEASE_DIRECTORY"/"$BASE_VERSION"_upgraded
 
 docker compose up -d prestashop-run
 echo "--- Docker container created for upgrade, see result at http://localhost:8002/admin ---"
