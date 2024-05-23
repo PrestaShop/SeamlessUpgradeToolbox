@@ -5,9 +5,10 @@ services:
             - "3306:3306"
         environment:
             MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+            MYSQL_DATABASE: prestashop
         restart: always
     work-base:
-        image: autoupgrade-scripts-work-base:${PRESTASHOP_WORK_BASE_VERSION}
+        image: autoupgrade-env-work-base:${PRESTASHOP_WORK_BASE_VERSION}
         build:
             dockerfile: ../.docker/Dockerfile
             context: .
@@ -26,7 +27,7 @@ services:
         ports:
             - "8002:80"
         volumes:
-            - ./${RELEASE_DIRECTORY}/${BASE_VERSION}_upgraded:/var/www/html/
+            - ./${RELEASE_DIRECTORY}/${PRESTASHOP_VERSION}:/var/www/html/
     composer:
         image: composer:latest
         volumes:
