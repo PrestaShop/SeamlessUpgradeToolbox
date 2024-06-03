@@ -1,0 +1,33 @@
+services:
+    mysql:
+        image: mysql:5.7
+        ports:
+            - "3306:3306"
+        environment:
+            MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+        restart: always
+    work-base:
+        image: autoupgrade-scripts-work-base:${PRESTASHOP_WORK_BASE_VERSION}
+        build:
+            dockerfile: ../.docker/Dockerfile
+            context: .
+            args:
+                - VERSION=${PRESTASHOP_WORK_BASE_VERSION}
+                - NODE_VERSION=${NODE_VERSION}
+                - USER_ID=${DOCKER_USER_ID}
+                - GROUP_ID=${DOCKER_GROUP_ID}
+        depends_on:
+            - mysql
+    prestashop-run:
+        image: prestashop/base:${PRESTASHOP_RUN_VERSION}
+        user: ${DOCKER_USER_ID:-1000}
+        depends_on:
+            - mysql
+        ports:
+            - "8002:80"
+        volumes:
+            - ./${RELEASE_DIRECTORY}/${BASE_VERSION}_rollback:/var/www/html/
+    composer:
+        image: composer:latest
+        volumes:
+            - ./:/var/www/html/
