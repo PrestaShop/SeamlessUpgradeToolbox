@@ -120,6 +120,7 @@ if [[ "$PRESTASHOP_DEVELOPMENT_VERSION" == true ]]; then
   fi
 
 install_module "$PRESTASHOP_VERSION"
+mv "$RELEASE_DIRECTORY"/"$PRESTASHOP_VERSION"/install "$RELEASE_DIRECTORY"/"$PRESTASHOP_VERSION"/install-dev
 
 if dpkg --compare-versions "$PRESTASHOP_VERSION" ge 9.0.0; then
   export PRESTASHOP_RUN_VERSION=8.1-apache
