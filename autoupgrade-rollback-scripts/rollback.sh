@@ -6,12 +6,15 @@ source .env
 export RELEASE_DIRECTORY=./releases
 export DUMP_DIRECTORY=./dumps
 export LOGS_DIRECTORY=./logs
+export CHECKSUMS_DIRECTORY=./checksums
 
 mkdir -p "$RELEASE_DIRECTORY"
 mkdir -p "$DUMP_DIRECTORY"
 mkdir -p "$LOGS_DIRECTORY"
+mkdir -p "$CHECKSUMS_DIRECTORY"
 
 # Remove previous executions
+rm -rf ./"$CHECKSUMS_DIRECTORY"/*
 rm -rf ./"$LOGS_DIRECTORY"/*
 rm -rf ./"$RELEASE_DIRECTORY"/*
 rm -rf ./"$DUMP_DIRECTORY"/*
@@ -249,6 +252,56 @@ rollback() {
   echo ""
 }
 
+create_md5_hashes() {
+  echo "--- Create MD5 hashes for $1 ... ---"
+
+  directory="$RELEASE_DIRECTORY/$1"
+  output_file="$CHECKSUMS_DIRECTORY/$1_hashes_$2.json"
+  ignore_dirs=("modules" "vendor" "var" "install" "js/jquery" "js/tiny_mce" "js/vendor" "admin/autoupgrade")
+  temp_file=$(mktemp)
+
+  find_cmd="find \"$directory\""
+  for dir in "${ignore_dirs[@]}"; do
+      find_cmd+=" -path \"$directory/$dir\" -prune -o"
+  done
+  find_cmd+=" -type f -print0"
+
+  eval "$find_cmd" | xargs -0 md5sum > "$temp_file"
+
+  echo "{" > "$output_file"
+
+  while IFS= read -r line
+  do
+    md5=$(echo "$line" | awk '{print $1}')
+    file=$(echo "$line" | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+    file=${file#"$directory/"}
+
+    file_escaped=$(jq -R <<< "$file")
+
+    echo "  $file_escaped: \"$md5\"," >> "$output_file"
+  done < "$temp_file"
+
+  sed -i '$ s/,$//' "$output_file"
+  echo "}" >> "$output_file"
+
+  rm "$temp_file"
+
+  echo "--- Create MD5 hashes for $1 done ---"
+  echo ""
+}
+
+compare_hashes_and_create_diff() {
+  echo "--- Create files hashes diff between $BASE_VERSION and $UPGRADE_VERSION ---"
+  file1=$CHECKSUMS_DIRECTORY/"$BASE_VERSION"_hashes_before_upgrade.json
+  file2=$CHECKSUMS_DIRECTORY/"$BASE_VERSION"_hashes_after_rollback.json
+
+  diff_file="$CHECKSUMS_DIRECTORY/differences.txt"
+
+  diff "$file1" "$file2" > "$diff_file"
+  echo "--- Create files hashes diff between $BASE_VERSION and $UPGRADE_VERSION done ---"
+  echo ""
+}
+
 docker compose up -d mysql
 download_release "$BASE_VERSION"
 sleep 10
@@ -258,6 +311,10 @@ install_module "$BASE_VERSION"
 
 if [[ "$CREATE_AND_COMPARE_DUMP_WITH_FRESH_INSTALL" == true ]]; then
   dump_DB "$BASE_VERSION"
+fi
+
+if [[ "$CREATE_AND_COMPARE_FILES_WITH_FRESH_INSTALL" == true ]]; then
+  create_md5_hashes "$BASE_VERSION" "before_upgrade"
 fi
 
 if [[ "$UPGRADE_DEVELOPMENT_VERSION" == true ]]; then
@@ -273,7 +330,14 @@ if [[ "$CREATE_AND_COMPARE_DUMP_WITH_FRESH_INSTALL" == true ]]; then
   create_DB_diff
 fi
 
+if [[ "$CREATE_AND_COMPARE_FILES_WITH_FRESH_INSTALL" == true ]]; then
+  create_md5_hashes "$BASE_VERSION" "after_rollback"
+  compare_hashes_and_create_diff
+fi
+
+
 mv "$RELEASE_DIRECTORY"/"$BASE_VERSION" "$RELEASE_DIRECTORY"/"$BASE_VERSION"_rollback
+mv "$RELEASE_DIRECTORY"/"$BASE_VERSION"_rollback/install "$RELEASE_DIRECTORY"/"$BASE_VERSION"_rollback/install-dev
 
 if dpkg --compare-versions "$UPGRADE_VERSION" ge 9.0.0; then
   export PRESTASHOP_RUN_VERSION=8.1-apache
