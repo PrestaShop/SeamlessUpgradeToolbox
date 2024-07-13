@@ -7,11 +7,13 @@ export RELEASE_DIRECTORY=./releases
 export DUMP_DIRECTORY=./dumps
 export LOGS_DIRECTORY=./logs
 export CHECKSUMS_DIRECTORY=./checksums
+export CACHE_DIRECTORY=../cache
 
 mkdir -p "$RELEASE_DIRECTORY"
 mkdir -p "$DUMP_DIRECTORY"
 mkdir -p "$LOGS_DIRECTORY"
 mkdir -p "$CHECKSUMS_DIRECTORY"
+mkdir -p "$CACHE_DIRECTORY"
 
 # Remove previous executions
 rm -rf ./"$CHECKSUMS_DIRECTORY"/*
@@ -32,21 +34,21 @@ fi
 install() {
   echo "--- Installation of v$1 ---"
   db_version="${1//./}"
-    if [[ "$PERFORM_ONLY_CORE_DATABASE_UPGRADE" == true ]]; then
-      presta_step=database
-    else
-      presta_step=all
-    fi
+  if [[ "$PERFORM_ONLY_CORE_DATABASE_UPGRADE" == true ]]; then
+    presta_step=database
+  else
+    presta_step=all
+  fi
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$1" work-base php install/index_cli.php \
     --step="$presta_step" --db_server=mysql:3306 --db_name=presta_"$db_version" --db_DOCKER_USER_ID=root --db_password="$MYSQL_ROOT_PASSWORD" --prefix=ps_ --db_clear=1 \
     --domain=localhost:8002 --firstname="Marc" --lastname="Beier" \
     --password=Toto123! --email=demo@prestashop.com --language=fr --country=fr \
     --newsletter=0 --send_email=0 --ssl=0 >"$LOGS_DIRECTORY"/"$1"_install
 
-    if grep -qiE 'fatal|error' "$LOGS_DIRECTORY"/"$1"_install; then
-        echo "Docker command failed. See $LOGS_DIRECTORY/$1_install. Stopping the script (v$1)."
-        exit 1
-    fi
+  if grep -qiE 'fatal|error' "$LOGS_DIRECTORY"/"$1"_install; then
+    echo "Docker command failed. See $LOGS_DIRECTORY/$1_install. Stopping the script (v$1)."
+    exit 1
+  fi
 
   echo "--- Installation of v$1 done ---"
 }
@@ -55,20 +57,33 @@ install() {
 # The contents of the ZIP are also copied to the releases folder under the version name
 download_release_and_xml() {
   echo "--- Download v$1 Prestashop release and xml MD5 ---"
-  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-    curl --fail -L https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip -o admin/autoupgrade/download/prestashop_"$1".zip
 
-  if [ ! $? -eq 0 ]; then
-    echo "Download v$1 Prestashop release zip fail, see" https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip
-    exit 1
+  if [ -e "$CACHE_DIRECTORY"/"$1".zip ]; then
+    echo "Cache detected ! skip download zip"
+    cp "$CACHE_DIRECTORY"/"$1".zip "$RELEASE_DIRECTORY"/"$BASE_VERSION"/admin/autoupgrade/download/prestashop_"$1".zip
+  else
+    docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
+      curl --fail -L https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip -o admin/autoupgrade/download/prestashop_"$1".zip
+
+    if [ ! $? -eq 0 ]; then
+      echo "Download v$1 Prestashop release zip fail, see" https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip
+      exit 1
+    fi
+    cp "$RELEASE_DIRECTORY"/"$BASE_VERSION"/admin/autoupgrade/download/prestashop_"$1".zip "$CACHE_DIRECTORY"/"$1".zip
   fi
 
-  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-    curl --fail -L https://api.prestashop.com/xml/md5/"$1".xml -o admin/autoupgrade/download/prestashop_"$1".xml
+  if [ -e "$CACHE_DIRECTORY"/"$1".xml ]; then
+    echo "Cache detected ! skip download xml"
+    cp "$CACHE_DIRECTORY"/"$1".xml "$RELEASE_DIRECTORY"/"$BASE_VERSION"/admin/autoupgrade/download/prestashop_"$1".xml
+  else
+    docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
+      curl --fail -L https://api.prestashop.com/xml/md5/"$1".xml -o admin/autoupgrade/download/prestashop_"$1".xml
 
-  if [ ! $? -eq 0 ]; then
-    echo "Download v$1 Prestashop release xml fail, see" https://api.prestashop.com/xml/md5/"$1".xml
-    exit 1
+    if [ ! $? -eq 0 ]; then
+      echo "Download v$1 Prestashop release xml fail, see" https://api.prestashop.com/xml/md5/"$1".xml
+      exit 1
+    fi
+    cp "$RELEASE_DIRECTORY"/"$BASE_VERSION"/admin/autoupgrade/download/prestashop_"$1".xml "$CACHE_DIRECTORY"/"$1".xml
   fi
 
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY" work-base /bin/sh -c \
@@ -77,15 +92,14 @@ download_release_and_xml() {
     rm prestashop_$1.zip;
     cd $1 || exit;
     unzip -o prestashop.zip >/dev/null;
-    rm prestashop.zip;
-    mkdir admin/autoupgrade/download;"
+    rm prestashop.zip;"
 
   if [ ! $? -eq 0 ]; then
     echo "Unzip v$1 Prestashop release fail"
     exit 1
   fi
 
-  echo "--- Download v$1 Prestashop release and xml MD5 ---"
+  echo "--- Download v$1 Prestashop release and xml MD5 done ---"
 }
 
 # Clean modules, for development purpose only
@@ -107,7 +121,7 @@ upgrade() {
 
 upgrade_experimental() {
   if [[ "$PERFORM_ONLY_CORE_DATABASE_UPGRADE" == true ]]; then
-      clean_modules
+    clean_modules
   fi
 
   build_dev_release "$2"
@@ -146,21 +160,29 @@ upgrade_process() {
 # The contents of the ZIP are copied to the releases folder under the version name
 download_release() {
   echo "--- Download v$1 Prestashop release ---"
-  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ work-base /bin/sh -c \
-    "cd $RELEASE_DIRECTORY || exit
-     curl --fail -LO https://github.com/PrestaShop/zip-archives/raw/main/prestashop_$1.zip;
-     unzip -o prestashop_$1.zip -d $1 >/dev/null;
+
+  if [ -e "$CACHE_DIRECTORY"/"$1".zip ]; then
+    echo "Cache detected ! skip download zip"
+    cp "$CACHE_DIRECTORY"/"$1".zip "$RELEASE_DIRECTORY"/prestashop_"$1".zip
+  else
+    docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY" work-base \
+      curl --fail -LO https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip
+
+    if [ ! $? -eq 0 ]; then
+      echo "Download v$1 Prestashop release zip fail, see" https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip
+      exit 1
+    fi
+    cp "$RELEASE_DIRECTORY"/prestashop_"$1".zip "$CACHE_DIRECTORY"/"$1".zip
+  fi
+
+  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY" work-base /bin/sh -c \
+    "unzip -o prestashop_$1.zip -d $1 >/dev/null;
      rm prestashop_$1.zip;
      cd $1 || exit;
      unzip -o prestashop.zip >/dev/null;
      rm prestashop.zip;
      mkdir admin/autoupgrade/download;
      cp -r ../$1 ../$1_base;"
-
-  if [ ! $? -eq 0 ]; then
-    echo "Download v$1 Prestashop release zip fail, see" https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip
-    exit 1
-  fi
 
   echo "--- Download v$1 Prestashop release done ---"
   echo ""
@@ -217,11 +239,11 @@ install_module() {
 dump_DB() {
   echo "--- Create dump for $1 ---"
   version="${1//./}"
-   if [[ -n "$2" ]]; then
-      docker compose run --rm mysql sh -c "exec mysqldump -hmysql -uroot --no-data --compact -p$MYSQL_ROOT_PASSWORD presta_$version" | sed 's/ AUTO_INCREMENT=[0-9]*\b//g' >"$DUMP_DIRECTORY"/"$2"_to_"$1"_dump_.sql
-   else
-      docker compose run --rm mysql sh -c "exec mysqldump -hmysql -uroot --no-data --compact -p$MYSQL_ROOT_PASSWORD presta_$version" | sed 's/ AUTO_INCREMENT=[0-9]*\b//g' >"$DUMP_DIRECTORY"/"$1"_dump_.sql
-   fi
+  if [[ -n "$2" ]]; then
+    docker compose run --rm mysql sh -c "exec mysqldump -hmysql -uroot --no-data --compact -p$MYSQL_ROOT_PASSWORD presta_$version" | sed 's/ AUTO_INCREMENT=[0-9]*\b//g' >"$DUMP_DIRECTORY"/"$2"_to_"$1"_dump_.sql
+  else
+    docker compose run --rm mysql sh -c "exec mysqldump -hmysql -uroot --no-data --compact -p$MYSQL_ROOT_PASSWORD presta_$version" | sed 's/ AUTO_INCREMENT=[0-9]*\b//g' >"$DUMP_DIRECTORY"/"$1"_dump_.sql
+  fi
   echo "--- Create dump for $1 done ---"
   echo ""
 }
@@ -237,7 +259,7 @@ create_DB_schema() {
 create_DB_diff() {
   echo "--- Create database diff between $BASE_VERSION and $BASE_VERSION with rollback ---"
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$DUMP_DIRECTORY" composer \
-     git diff "$UPGRADE_VERSION"_to_"$BASE_VERSION"_dump_.sql "$BASE_VERSION"_dump_.sql > "$DUMP_DIRECTORY"/diff_"$UPGRADE_VERSION"_rollback_"$BASE_VERSION".txt
+    git diff "$UPGRADE_VERSION"_to_"$BASE_VERSION"_dump_.sql "$BASE_VERSION"_dump_.sql >"$DUMP_DIRECTORY"/diff_"$UPGRADE_VERSION"_rollback_"$BASE_VERSION".txt
   echo "--- Create database diff done ---"
   echo ""
 }
@@ -245,9 +267,9 @@ create_DB_diff() {
 rollback() {
   echo "--- Start rollback ---"
   rollback_dir=$(docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-    bash -c "ls -td -- admin/autoupgrade/backup/*/ | head -n 1 | rev | cut -d'/' -f2 | rev | tr -d '\n'");
+    bash -c "ls -td -- admin/autoupgrade/backup/*/ | head -n 1 | rev | cut -d'/' -f2 | rev | tr -d '\n'")
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-    php modules/autoupgrade/cli-rollback.php --dir="admin" --backup="$rollback_dir" >>"$LOGS_DIRECTORY"/"$BASE_VERSION"_rollback;
+    php modules/autoupgrade/cli-rollback.php --dir="admin" --backup="$rollback_dir" >>"$LOGS_DIRECTORY"/"$BASE_VERSION"_rollback
   echo "--- Rollback done ---"
   echo ""
 }
@@ -262,27 +284,26 @@ create_md5_hashes() {
 
   find_cmd="find \"$directory\""
   for dir in "${ignore_dirs[@]}"; do
-      find_cmd+=" -path \"$directory/$dir\" -prune -o"
+    find_cmd+=" -path \"$directory/$dir\" -prune -o"
   done
   find_cmd+=" -type f -print0"
 
-  eval "$find_cmd" | xargs -0 md5sum > "$temp_file"
+  eval "$find_cmd" | xargs -0 md5sum >"$temp_file"
 
-  echo "{" > "$output_file"
+  echo "{" >"$output_file"
 
-  while IFS= read -r line
-  do
+  while IFS= read -r line; do
     md5=$(echo "$line" | awk '{print $1}')
     file=$(echo "$line" | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
     file=${file#"$directory/"}
 
-    file_escaped=$(jq -R <<< "$file")
+    file_escaped=$(jq -R <<<"$file")
 
-    echo "  $file_escaped: \"$md5\"," >> "$output_file"
-  done < "$temp_file"
+    echo "  $file_escaped: \"$md5\"," >>"$output_file"
+  done <"$temp_file"
 
   sed -i '$ s/,$//' "$output_file"
-  echo "}" >> "$output_file"
+  echo "}" >>"$output_file"
 
   rm "$temp_file"
 
@@ -297,7 +318,7 @@ compare_hashes_and_create_diff() {
 
   diff_file="$CHECKSUMS_DIRECTORY/differences.txt"
 
-  diff "$file1" "$file2" > "$diff_file"
+  diff "$file1" "$file2" >"$diff_file"
   echo "--- Create files hashes diff between $BASE_VERSION and $UPGRADE_VERSION done ---"
   echo ""
 }
@@ -334,7 +355,6 @@ if [[ "$CREATE_AND_COMPARE_FILES_WITH_FRESH_INSTALL" == true ]]; then
   create_md5_hashes "$BASE_VERSION" "after_rollback"
   compare_hashes_and_create_diff
 fi
-
 
 mv "$RELEASE_DIRECTORY"/"$BASE_VERSION" "$RELEASE_DIRECTORY"/"$BASE_VERSION"_rollback
 mv "$RELEASE_DIRECTORY"/"$BASE_VERSION"_rollback/install "$RELEASE_DIRECTORY"/"$BASE_VERSION"_rollback/install-dev

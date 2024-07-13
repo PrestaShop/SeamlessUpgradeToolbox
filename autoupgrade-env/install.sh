@@ -5,9 +5,11 @@ source .env
 # Working directories
 export RELEASE_DIRECTORY=./release
 export LOGS_DIRECTORY=./logs
+export CACHE_DIRECTORY=../cache
 
 mkdir -p "$RELEASE_DIRECTORY"
 mkdir -p "$LOGS_DIRECTORY"
+mkdir -p "$CACHE_DIRECTORY"
 
 # Remove previous executions
 rm -rf ./"$RELEASE_DIRECTORY"/*
@@ -31,10 +33,10 @@ install() {
     --password=Toto123! --email=demo@prestashop.com --language=fr --country=fr \
     --newsletter=0 --send_email=0 --ssl=0 >"$LOGS_DIRECTORY"/"$1"_install
 
-    if grep -qiE 'fatal|error' "$LOGS_DIRECTORY"/"$1"_install; then
-        echo "Docker command failed. See $LOGS_DIRECTORY/$1_install. Stopping the script (v$1)."
-        exit 1
-    fi
+  if grep -qiE 'fatal|error' "$LOGS_DIRECTORY"/"$1"_install; then
+    echo "Docker command failed. See $LOGS_DIRECTORY/$1_install. Stopping the script (v$1)."
+    exit 1
+  fi
 
   echo "--- Installation of v$1 done ---"
 }
@@ -43,20 +45,29 @@ install() {
 # The contents of the ZIP are copied to the releases folder under the version name
 download_release() {
   echo "--- Download v$1 Prestashop release ---"
-  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ work-base /bin/sh -c \
-    "cd $RELEASE_DIRECTORY || exit
-     curl --fail -LO https://github.com/PrestaShop/zip-archives/raw/main/prestashop_$1.zip;
-     unzip -o prestashop_$1.zip -d $1 >/dev/null;
+
+  if [ -e "$CACHE_DIRECTORY"/"$1".zip ]; then
+    echo "Cache detected ! skip download zip"
+    cp "$CACHE_DIRECTORY"/"$1".zip "$RELEASE_DIRECTORY"/prestashop_"$1".zip
+  else
+    docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY" work-base \
+      curl --fail -LO https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip
+
+    if [ ! $? -eq 0 ]; then
+      echo "Download v$1 Prestashop release zip fail, see" https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip
+      exit 1
+    fi
+    cp "$RELEASE_DIRECTORY"/prestashop_"$1".zip "$CACHE_DIRECTORY"/"$1".zip
+  fi
+
+  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY" work-base /bin/sh -c \
+    "unzip -o prestashop_$1.zip -d $1 >/dev/null;
      rm prestashop_$1.zip;
      cd $1 || exit;
      unzip -o prestashop.zip >/dev/null;
      rm prestashop.zip;
-     mkdir admin/autoupgrade/download;"
-
-  if [ ! $? -eq 0 ]; then
-    echo "Download v$1 Prestashop release zip fail, see" https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip
-    exit 1
-  fi
+     mkdir admin/autoupgrade/download;
+     cp -r ../$1 ../$1_base;"
 
   echo "--- Download v$1 Prestashop release done ---"
   echo ""
@@ -111,13 +122,13 @@ install_module() {
 docker compose up -d mysql
 
 if [[ "$PRESTASHOP_DEVELOPMENT_VERSION" == true ]]; then
-      build_dev_release "$PRESTASHOP_VERSION"
-      install "$PRESTASHOP_VERSION"
-    else
-      download_release "$PRESTASHOP_VERSION"
-      sleep 10
-      install "$PRESTASHOP_VERSION"
-  fi
+  build_dev_release "$PRESTASHOP_VERSION"
+  install "$PRESTASHOP_VERSION"
+else
+  download_release "$PRESTASHOP_VERSION"
+  sleep 10
+  install "$PRESTASHOP_VERSION"
+fi
 
 install_module "$PRESTASHOP_VERSION"
 mv "$RELEASE_DIRECTORY"/"$PRESTASHOP_VERSION"/install "$RELEASE_DIRECTORY"/"$PRESTASHOP_VERSION"/install-dev
