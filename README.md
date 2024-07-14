@@ -1,5 +1,4 @@
-# About SeamlessUpgradeToolbox
---------
+# About SeamlessUpgradeToolbox
 
 Welcome to the **Seamless Upgrade Toolbox** repo. In this repo, you will find several applications enabling you to test the proper running of PrestaShop upgrades (including Core, modules, themes, dependencies). Here is the list of tools currently available:
 
@@ -23,4 +22,4 @@ The script allows testing the rollback between 2 versions of PrestaShop, with th
 - create a database dump before upgrade and comparing it with another dump created after the rollback
 - create file hashes before upgrade and comparing it with another hashes created after the rollback
 
-**Link:** [Autoupgrade-rollback-scripts](https://github.com/PrestaShop/SeamlessUpgradeToolbox/tree/main/autoupgrade-rollback-env)
+**Link:** [Autoupgrade-rollback-scripts](https://github.com/PrestaShop/SeamlessUpgradeToolbox/tree/main/autoupgrade-rollback-scripts)

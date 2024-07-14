@@ -1,6 +1,7 @@
 #!/bin/bash
 
 source .env
+source ../lib/autoupgrade-lib.sh
 
 # Working directories
 export RELEASE_DIRECTORY=./releases
@@ -31,6 +32,9 @@ else
 fi
 
 # Install Prestashop. Stop process on error
+# Params:
+#   $1 - release to install. ex: 8.0.5
+#
 install() {
   echo "--- Installation of v$1 ---"
   db_version="${1//./}"
@@ -51,81 +55,6 @@ install() {
   fi
 
   echo "--- Installation of v$1 done ---"
-}
-
-# Download ZIP and XML for upgrade. This will place them in the folder "$RELEASE_DIRECTORY"/"$BASE_VERSION"/admin/autoupgrade/download.
-# The contents of the ZIP are also copied to the releases folder under the version name
-download_release_and_xml() {
-  echo "--- Download v$1 Prestashop release and xml MD5 ---"
-
-  if [ -e "$CACHE_DIRECTORY"/"$1".zip ]; then
-    echo "Cache detected ! skip download zip"
-    cp "$CACHE_DIRECTORY"/"$1".zip "$RELEASE_DIRECTORY"/"$BASE_VERSION"/admin/autoupgrade/download/prestashop_"$1".zip
-  else
-    docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-      curl --fail -L https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip -o admin/autoupgrade/download/prestashop_"$1".zip
-
-    if [ ! $? -eq 0 ]; then
-      echo "Download v$1 Prestashop release zip fail, see" https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip
-      exit 1
-    fi
-    cp "$RELEASE_DIRECTORY"/"$BASE_VERSION"/admin/autoupgrade/download/prestashop_"$1".zip "$CACHE_DIRECTORY"/"$1".zip
-  fi
-
-  if [ -e "$CACHE_DIRECTORY"/"$1".xml ]; then
-    echo "Cache detected ! skip download xml"
-    cp "$CACHE_DIRECTORY"/"$1".xml "$RELEASE_DIRECTORY"/"$BASE_VERSION"/admin/autoupgrade/download/prestashop_"$1".xml
-  else
-    docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-      curl --fail -L https://api.prestashop.com/xml/md5/"$1".xml -o admin/autoupgrade/download/prestashop_"$1".xml
-
-    if [ ! $? -eq 0 ]; then
-      echo "Download v$1 Prestashop release xml fail, see" https://api.prestashop.com/xml/md5/"$1".xml
-      exit 1
-    fi
-    cp "$RELEASE_DIRECTORY"/"$BASE_VERSION"/admin/autoupgrade/download/prestashop_"$1".xml "$CACHE_DIRECTORY"/"$1".xml
-  fi
-
-  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY" work-base /bin/sh -c \
-    "cp $BASE_VERSION/admin/autoupgrade/download/prestashop_"$1".zip .
-    unzip -o prestashop_$1.zip -d $1 >/dev/null;
-    rm prestashop_$1.zip;
-    cd $1 || exit;
-    unzip -o prestashop.zip >/dev/null;
-    rm prestashop.zip;"
-
-  if [ ! $? -eq 0 ]; then
-    echo "Unzip v$1 Prestashop release fail"
-    exit 1
-  fi
-
-  echo "--- Download v$1 Prestashop release and xml MD5 done ---"
-}
-
-# Clean modules, for development purpose only
-clean_modules() {
-  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base /bin/sh -c \
-    "cp -r modules/autoupgrade .;
-    rm -rf modules/*;
-    mv autoupgrade modules/;"
-}
-
-upgrade() {
-  if [[ "$PERFORM_ONLY_CORE_DATABASE_UPGRADE" == true ]]; then
-    clean_modules
-  fi
-
-  download_release_and_xml "$2"
-  upgrade_process "$1" "$2"
-}
-
-upgrade_experimental() {
-  if [[ "$PERFORM_ONLY_CORE_DATABASE_UPGRADE" == true ]]; then
-    clean_modules
-  fi
-
-  build_dev_release "$2"
-  upgrade_process "$1" "$2"
 }
 
 upgrade_process() {
@@ -154,38 +83,6 @@ upgrade_process() {
   fi
 
   echo "--- Upgrade from v$1 to v$2 done ---"
-}
-
-# Download ZIP for initial install.
-# The contents of the ZIP are copied to the releases folder under the version name
-download_release() {
-  echo "--- Download v$1 Prestashop release ---"
-
-  if [ -e "$CACHE_DIRECTORY"/"$1".zip ]; then
-    echo "Cache detected ! skip download zip"
-    cp "$CACHE_DIRECTORY"/"$1".zip "$RELEASE_DIRECTORY"/prestashop_"$1".zip
-  else
-    docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY" work-base \
-      curl --fail -LO https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip
-
-    if [ ! $? -eq 0 ]; then
-      echo "Download v$1 Prestashop release zip fail, see" https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip
-      exit 1
-    fi
-    cp "$RELEASE_DIRECTORY"/prestashop_"$1".zip "$CACHE_DIRECTORY"/"$1".zip
-  fi
-
-  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY" work-base /bin/sh -c \
-    "unzip -o prestashop_$1.zip -d $1 >/dev/null;
-     rm prestashop_$1.zip;
-     cd $1 || exit;
-     unzip -o prestashop.zip >/dev/null;
-     rm prestashop.zip;
-     mkdir admin/autoupgrade/download;
-     cp -r ../$1 ../$1_base;"
-
-  echo "--- Download v$1 Prestashop release done ---"
-  echo ""
 }
 
 # Download and build development branch.
@@ -217,25 +114,10 @@ build_dev_release() {
   echo ""
 }
 
-# Download autoupgrade module
-install_module() {
-  echo "--- Install autoupgrade module (dev version) --- "
-  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$1" composer /bin/sh -c \
-    "cd modules;
-     git clone $AUTOUPGRADE_GIT_REPO;
-     cd autoupgrade;
-     git checkout $AUTOUPGRADE_GIT_BRANCH;
-     composer install;"
-
-  if [ ! $? -eq 0 ]; then
-    echo "Install autoupgrade module fail"
-    exit 1
-  fi
-
-  echo "--- Install autoupgrade module (dev version) done ---"
-  echo ""
-}
-
+# Params:
+#   $1 - Prestashop version target for dump. ex: 8.0.5
+#   $2 - If set, specify destination version in dump filename. ex: 8.1.7
+#
 dump_DB() {
   echo "--- Create dump for $1 ---"
   version="${1//./}"
@@ -248,14 +130,9 @@ dump_DB() {
   echo ""
 }
 
-create_DB_schema() {
-  echo "--- Create database schema for $1 ---"
-  version="${1//./}"
-  docker compose run --rm mysql mysql -hmysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e "CREATE DATABASE presta_$version;"
-  echo "--- Create database schema for $1 done ---"
-  echo ""
-}
-
+# Params:
+#   $1 - Prestashop version. ex: 8.0.5
+#
 create_DB_diff() {
   echo "--- Create database diff between $BASE_VERSION and $BASE_VERSION with rollback ---"
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$DUMP_DIRECTORY" composer \
@@ -274,12 +151,15 @@ rollback() {
   echo ""
 }
 
+# Params:
+#   $1 - target Prestashop version in release folder. ex: 8.0.5
+#
 create_md5_hashes() {
   echo "--- Create MD5 hashes for $1 ... ---"
 
   directory="$RELEASE_DIRECTORY/$1"
   output_file="$CHECKSUMS_DIRECTORY/$1_hashes_$2.json"
-  ignore_dirs=("modules" "vendor" "var" "install" "js/jquery" "js/tiny_mce" "js/vendor" "admin/autoupgrade")
+  ignore_dirs=("modules" "vendor" "var" "translations" "localization" "install" "js/jquery" "js/tiny_mce" "js/vendor" "admin/autoupgrade")
   temp_file=$(mktemp)
 
   find_cmd="find \"$directory\""
