@@ -90,7 +90,7 @@ upgrade_process() {
 build_dev_release() {
   echo "--- Download v$1 Prestashop and build release ---"
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/releases work-base /bin/sh -c \
-    "git clone https://github.com/PrestaShop/PrestaShop.git;
+    "git clone --depth 1 https://github.com/PrestaShop/PrestaShop.git;
     cd PrestaShop;
     git checkout $UPGRADE_DEVELOPMENT_BRANCH;
     php tools/build/CreateRelease.php --version=$1 --destination-dir=$1;
