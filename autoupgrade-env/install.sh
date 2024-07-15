@@ -97,4 +97,4 @@ else
 fi
 
 docker compose up -d prestashop-run
-echo "--- Docker container created for test module environment, see result at http://localhost:8002/admin ---"
+echo "--- Docker container created for test module environment, see result at http://localhost:8002/$ADMIN_DIR ---"

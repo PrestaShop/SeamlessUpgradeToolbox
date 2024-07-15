@@ -29,13 +29,14 @@ download_release() {
      unzip -o prestashop.zip >/dev/null;
      rm prestashop.zip;
      mkdir admin/autoupgrade/download;
+     mv admin $ADMIN_DIR;
      cp -r ../$1 ../$1_base;"
 
   echo "--- Download v$1 Prestashop release done ---"
   echo ""
 }
 
-# Download ZIP and XML for upgrade. This will place them in the folder "$RELEASE_DIRECTORY"/"$BASE_VERSION"/admin/autoupgrade/download.
+# Download ZIP and XML for upgrade. This will place them in the folder "$RELEASE_DIRECTORY"/"$BASE_VERSION"/"$ADMIN_DIR"/autoupgrade/download.
 # The contents of the ZIP are also copied to the releases folder under the version name
 # Params:
 #   $1 - release to download. ex: 8.0.5
@@ -45,34 +46,34 @@ download_release_and_xml() {
 
   if [ -e "$CACHE_DIRECTORY"/"$1".zip ]; then
     echo "Cache detected ! skip download zip"
-    cp "$CACHE_DIRECTORY"/"$1".zip "$RELEASE_DIRECTORY"/"$BASE_VERSION"/admin/autoupgrade/download/prestashop_"$1".zip
+    cp "$CACHE_DIRECTORY"/"$1".zip "$RELEASE_DIRECTORY"/"$BASE_VERSION"/"$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".zip
   else
     docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-      curl --fail -L https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip -o admin/autoupgrade/download/prestashop_"$1".zip
+      curl --fail -L https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip -o "$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".zip
 
     if [ ! $? -eq 0 ]; then
       echo "Download v$1 Prestashop release zip fail, see" https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip
       exit 1
     fi
-    cp "$RELEASE_DIRECTORY"/"$BASE_VERSION"/admin/autoupgrade/download/prestashop_"$1".zip "$CACHE_DIRECTORY"/"$1".zip
+    cp "$RELEASE_DIRECTORY"/"$BASE_VERSION"/"$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".zip "$CACHE_DIRECTORY"/"$1".zip
   fi
 
   if [ -e "$CACHE_DIRECTORY"/"$1".xml ]; then
     echo "Cache detected ! skip download xml"
-    cp "$CACHE_DIRECTORY"/"$1".xml "$RELEASE_DIRECTORY"/"$BASE_VERSION"/admin/autoupgrade/download/prestashop_"$1".xml
+    cp "$CACHE_DIRECTORY"/"$1".xml "$RELEASE_DIRECTORY"/"$BASE_VERSION"/"$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".xml
   else
     docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-      curl --fail -L https://api.prestashop.com/xml/md5/"$1".xml -o admin/autoupgrade/download/prestashop_"$1".xml
+      curl --fail -L https://api.prestashop.com/xml/md5/"$1".xml -o "$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".xml
 
     if [ ! $? -eq 0 ]; then
       echo "Download v$1 Prestashop release xml fail, see" https://api.prestashop.com/xml/md5/"$1".xml
       exit 1
     fi
-    cp "$RELEASE_DIRECTORY"/"$BASE_VERSION"/admin/autoupgrade/download/prestashop_"$1".xml "$CACHE_DIRECTORY"/"$1".xml
+    cp "$RELEASE_DIRECTORY"/"$BASE_VERSION"/"$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".xml "$CACHE_DIRECTORY"/"$1".xml
   fi
 
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY" work-base /bin/sh -c \
-    "cp $BASE_VERSION/admin/autoupgrade/download/prestashop_"$1".zip .
+    "cp $BASE_VERSION/"$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".zip .
     unzip -o prestashop_$1.zip -d $1 >/dev/null;
     rm prestashop_$1.zip;
     cd $1 || exit;
