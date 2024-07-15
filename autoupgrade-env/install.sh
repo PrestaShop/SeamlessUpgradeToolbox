@@ -1,13 +1,16 @@
 #!/bin/bash
 
 source .env
+source ../lib/autoupgrade-lib.sh
 
 # Working directories
 export RELEASE_DIRECTORY=./release
 export LOGS_DIRECTORY=./logs
+export CACHE_DIRECTORY=../cache
 
 mkdir -p "$RELEASE_DIRECTORY"
 mkdir -p "$LOGS_DIRECTORY"
+mkdir -p "$CACHE_DIRECTORY"
 
 # Remove previous executions
 rm -rf ./"$RELEASE_DIRECTORY"/*
@@ -23,6 +26,9 @@ else
 fi
 
 # Install Prestashop. Stop process on error
+# Params:
+#   $1 - release to install. ex: 8.0.5
+#
 install() {
   echo "--- Installation of v$1 ---"
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$1" work-base php install/index_cli.php \
@@ -31,43 +37,23 @@ install() {
     --password=Toto123! --email=demo@prestashop.com --language=fr --country=fr \
     --newsletter=0 --send_email=0 --ssl=0 >"$LOGS_DIRECTORY"/"$1"_install
 
-    if grep -qiE 'fatal|error' "$LOGS_DIRECTORY"/"$1"_install; then
-        echo "Docker command failed. See $LOGS_DIRECTORY/$1_install. Stopping the script (v$1)."
-        exit 1
-    fi
+  if grep -qiE 'fatal|error' "$LOGS_DIRECTORY"/"$1"_install; then
+    echo "Docker command failed. See $LOGS_DIRECTORY/$1_install. Stopping the script (v$1)."
+    exit 1
+  fi
 
   echo "--- Installation of v$1 done ---"
 }
 
-# Download ZIP for initial install.
-# The contents of the ZIP are copied to the releases folder under the version name
-download_release() {
-  echo "--- Download v$1 Prestashop release ---"
-  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ work-base /bin/sh -c \
-    "cd $RELEASE_DIRECTORY || exit
-     curl --fail -LO https://github.com/PrestaShop/zip-archives/raw/main/prestashop_$1.zip;
-     unzip -o prestashop_$1.zip -d $1 >/dev/null;
-     rm prestashop_$1.zip;
-     cd $1 || exit;
-     unzip -o prestashop.zip >/dev/null;
-     rm prestashop.zip;
-     mkdir admin/autoupgrade/download;"
-
-  if [ ! $? -eq 0 ]; then
-    echo "Download v$1 Prestashop release zip fail, see" https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip
-    exit 1
-  fi
-
-  echo "--- Download v$1 Prestashop release done ---"
-  echo ""
-}
-
 # Download and build development branch.
 # The contents of the ZIP are copied to the releases folder under the version name
+# Params:
+#   $1 - release to build. ex: 8.0.5
+#
 build_dev_release() {
   echo "--- Download v$1 Prestashop and build release ---"
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/release work-base /bin/sh -c \
-    "git clone https://github.com/PrestaShop/PrestaShop.git;
+    "git clone --depth 1 https://github.com/PrestaShop/PrestaShop.git;
     cd PrestaShop;
     git checkout $PRESTASHOP_DEVELOPMENT_BRANCH;
     php tools/build/CreateRelease.php --version=$1 --destination-dir=$1;
@@ -89,35 +75,16 @@ build_dev_release() {
   echo ""
 }
 
-# Download autoupgrade module
-install_module() {
-  echo "--- Install autoupgrade module (dev version) --- "
-  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$1" composer /bin/sh -c \
-    "cd modules;
-     git clone $AUTOUPGRADE_GIT_REPO;
-     cd autoupgrade;
-     git checkout $AUTOUPGRADE_GIT_BRANCH;
-     composer install;"
-
-  if [ ! $? -eq 0 ]; then
-    echo "Install autoupgrade module fail"
-    exit 1
-  fi
-
-  echo "--- Install autoupgrade module (dev version) done ---"
-  echo ""
-}
-
 docker compose up -d mysql
 
 if [[ "$PRESTASHOP_DEVELOPMENT_VERSION" == true ]]; then
-      build_dev_release "$PRESTASHOP_VERSION"
-      install "$PRESTASHOP_VERSION"
-    else
-      download_release "$PRESTASHOP_VERSION"
-      sleep 10
-      install "$PRESTASHOP_VERSION"
-  fi
+  build_dev_release "$PRESTASHOP_VERSION"
+  install "$PRESTASHOP_VERSION"
+else
+  download_release "$PRESTASHOP_VERSION"
+  sleep 10
+  install "$PRESTASHOP_VERSION"
+fi
 
 install_module "$PRESTASHOP_VERSION"
 mv "$RELEASE_DIRECTORY"/"$PRESTASHOP_VERSION"/install "$RELEASE_DIRECTORY"/"$PRESTASHOP_VERSION"/install-dev
