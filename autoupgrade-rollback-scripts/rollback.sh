@@ -69,13 +69,13 @@ upgrade_process() {
     sh -c "echo '{\"channel\":\"archive\",\"archive_prestashop\":\"prestashop_$2.zip\",\"archive_num\":\"$2\", \"archive_xml\":\"prestashop_$2.xml\", \"PS_AUTOUP_CHANGE_DEFAULT_THEME\":\"0\", \"skip_backup\": \"0\"}' > modules/autoupgrade/config.json"
 
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-    php modules/autoupgrade/cli-updateconfig.php --from=modules/autoupgrade/config.json --dir="admin" >"$LOGS_DIRECTORY"/"$2"_upgrade
+    php modules/autoupgrade/cli-updateconfig.php --from=modules/autoupgrade/config.json --dir="$ADMIN_DIR" >"$LOGS_DIRECTORY"/"$2"_upgrade
 
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-    php modules/autoupgrade/cli-upgrade.php --dir="admin" --action="compareReleases" >>"$LOGS_DIRECTORY"/"$2"_upgrade
+    php modules/autoupgrade/cli-upgrade.php --dir="$ADMIN_DIR" --action="compareReleases" >>"$LOGS_DIRECTORY"/"$2"_upgrade
 
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-    php modules/autoupgrade/cli-upgrade.php --dir="admin" >>"$LOGS_DIRECTORY"/"$2"_upgrade
+    php modules/autoupgrade/cli-upgrade.php --dir="$ADMIN_DIR" >>"$LOGS_DIRECTORY"/"$2"_upgrade
 
   if [ ! $? -eq 0 ]; then
     echo "Upgrade from v$1 to v$2 fail, see" "$LOGS_DIRECTORY"/"$2"_upgrade
@@ -95,8 +95,8 @@ build_dev_release() {
     git checkout $UPGRADE_DEVELOPMENT_BRANCH;
     php tools/build/CreateRelease.php --version=$1 --destination-dir=$1;
     cp $1/prestashop_$1.zip ../;
-    mv $1/prestashop_$1.zip /var/www/html/$RELEASE_DIRECTORY/$BASE_VERSION/admin/autoupgrade/download;
-    mv $1/prestashop_$1.xml /var/www/html/$RELEASE_DIRECTORY/$BASE_VERSION/admin/autoupgrade/download;
+    mv $1/prestashop_$1.zip /var/www/html/$RELEASE_DIRECTORY/$BASE_VERSION/$ADMIN_DIR/autoupgrade/download;
+    mv $1/prestashop_$1.xml /var/www/html/$RELEASE_DIRECTORY/$BASE_VERSION/$ADMIN_DIR/autoupgrade/download;
     cd ..;
     rm -rf PrestaShop;
     unzip -o prestashop_$1.zip -d $1 >/dev/null;
@@ -144,9 +144,9 @@ create_DB_diff() {
 rollback() {
   echo "--- Start rollback ---"
   rollback_dir=$(docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-    bash -c "ls -td -- admin/autoupgrade/backup/*/ | head -n 1 | rev | cut -d'/' -f2 | rev | tr -d '\n'")
+    bash -c "ls -td -- $ADMIN_DIR/autoupgrade/backup/*/ | head -n 1 | rev | cut -d'/' -f2 | rev | tr -d '\n'")
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-    php modules/autoupgrade/cli-rollback.php --dir="admin" --backup="$rollback_dir" >>"$LOGS_DIRECTORY"/"$BASE_VERSION"_rollback
+    php modules/autoupgrade/cli-rollback.php --dir="$ADMIN_DIR" --backup="$rollback_dir" >>"$LOGS_DIRECTORY"/"$BASE_VERSION"_rollback
   echo "--- Rollback done ---"
   echo ""
 }
@@ -159,7 +159,7 @@ create_md5_hashes() {
 
   directory="$RELEASE_DIRECTORY/$1"
   output_file="$CHECKSUMS_DIRECTORY/$1_hashes_$2.json"
-  ignore_dirs=("modules" "vendor" "var" "translations" "localization" "install" "js/jquery" "js/tiny_mce" "js/vendor" "admin/autoupgrade")
+  ignore_dirs=("modules" "vendor" "var" "translations" "localization" "install" "js/jquery" "js/tiny_mce" "js/vendor" "$ADMIN_DIR/autoupgrade")
   temp_file=$(mktemp)
 
   find_cmd="find \"$directory\""
@@ -247,4 +247,4 @@ else
 fi
 
 docker compose up -d prestashop-run
-echo "--- Docker container created for upgrade, see result at http://localhost:8002/admin ---"
+echo "--- Docker container created for upgrade, see result at http://localhost:8002/$ADMIN_DIR ---"
