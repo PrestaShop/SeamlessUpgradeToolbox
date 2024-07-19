@@ -96,7 +96,7 @@ install_module() {
   echo "--- Install autoupgrade module (dev version) --- "
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$1" composer /bin/sh -c \
     "cd modules;
-     git clone --depth 1 $AUTOUPGRADE_GIT_REPO;
+     git clone $AUTOUPGRADE_GIT_REPO;
      cd autoupgrade;
      git checkout $AUTOUPGRADE_GIT_BRANCH;
      composer install;"
