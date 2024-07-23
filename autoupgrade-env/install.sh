@@ -34,7 +34,7 @@ install() {
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$1" work-base php install/index_cli.php \
     --step=all --db_server=mysql:3306 --db_name=prestashop --db_DOCKER_USER_ID=root --db_password="$MYSQL_ROOT_PASSWORD" --prefix=ps_ --db_clear=1 \
     --domain=localhost:8002 --firstname="Marc" --lastname="Beier" \
-    --password=Toto123! --email=demo@prestashop.com --language=fr --country=fr \
+    --password="$BO_PASSWORD" --email="$BO_EMAIL" --language=en --country=us \
     --newsletter=0 --send_email=0 --ssl=0 >"$LOGS_DIRECTORY"/"$1"_install
 
   if grep -qiE 'fatal|error' "$LOGS_DIRECTORY"/"$1"_install; then

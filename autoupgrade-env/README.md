@@ -22,10 +22,7 @@ $ ./install.sh
 - logs: contains installs and upgrades logs
 - release: contains Prestashop release
 
-The updated store is available at http://localhost:8002/admin (by default) after process
-
-**Email:** demo@prestashop.com
-**Password:** Toto123!
+The updated store is available at http://localhost:8002/admin1234 (by default) after process
 
 ## Available versions
 
