@@ -66,7 +66,22 @@ upgrade_process() {
   fi
 
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-    sh -c "echo '{\"channel\":\"archive\",\"archive_prestashop\":\"prestashop_$2.zip\",\"archive_num\":\"$2\", \"archive_xml\":\"prestashop_$2.xml\", \"PS_AUTOUP_CHANGE_DEFAULT_THEME\":\"0\", \"skip_backup\": \"0\"}' > modules/autoupgrade/config.json"
+    sh -c "echo '{
+      \"channel\":\"archive\",
+      \"archive_prestashop\":\"prestashop_$2.zip\",
+      \"archive_num\":\"$2\",
+      \"archive_xml\":\"prestashop_$2.xml\",
+      \"PS_AUTOUP_PERFORMANCE\":\"$PS_AUTOUP_PERFORMANCE\",
+      \"PS_AUTOUP_CUSTOM_MOD_DESACT\":\"$PS_AUTOUP_CUSTOM_MOD_DESACT\",
+      \"PS_AUTOUP_UPDATE_DEFAULT_THEME\":\"$PS_AUTOUP_UPDATE_DEFAULT_THEME\",
+      \"PS_AUTOUP_CHANGE_DEFAULT_THEME\":\"$PS_AUTOUP_CHANGE_DEFAULT_THEME\",
+      \"PS_AUTOUP_UPDATE_RTL_FILES\":\"$PS_AUTOUP_UPDATE_RTL_FILES\",
+      \"PS_AUTOUP_KEEP_MAILS\":\"$PS_AUTOUP_KEEP_MAILS\",
+      \"PS_AUTOUP_BACKUP\":\"$PS_AUTOUP_BACKUP\",
+      \"PS_AUTOUP_KEEP_IMAGES\":\"$PS_AUTOUP_KEEP_IMAGES\",
+      \"PS_DISABLE_OVERRIDES\":\"$PS_DISABLE_OVERRIDES\",
+      \"skip_backup\": \"0\"
+      }' > modules/autoupgrade/config.json"
 
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
     php modules/autoupgrade/cli-updateconfig.php --from=modules/autoupgrade/config.json --dir="$ADMIN_DIR" >"$LOGS_DIRECTORY"/"$2"_upgrade
