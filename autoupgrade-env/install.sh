@@ -52,7 +52,7 @@ install() {
 #
 build_dev_release() {
   echo "--- Download v$1 Prestashop and build release ---"
-  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/release work-base /bin/sh -c \
+  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/$RELEASE_DIRECTORY work-base /bin/sh -c \
     "git clone --depth 1 https://github.com/PrestaShop/PrestaShop.git;
     cd PrestaShop;
     git checkout $PRESTASHOP_DEVELOPMENT_BRANCH;
@@ -64,6 +64,7 @@ build_dev_release() {
     rm prestashop_$1.zip;
     cd $1 || exit;
     unzip -o prestashop.zip >/dev/null;
+    mv admin $ADMIN_DIR;
     rm prestashop.zip;"
 
   if [ ! $? -eq 0 ]; then
