@@ -78,6 +78,11 @@ build_dev_release() {
 
 docker compose up -d mysql
 
+if [ $? -ne 0 ]; then
+  echo "Docker compose command failed. Stopping process."
+  exit 1
+fi
+
 if [[ "$PRESTASHOP_DEVELOPMENT_VERSION" == true ]]; then
   build_dev_release "$PRESTASHOP_VERSION"
   install "$PRESTASHOP_VERSION"
@@ -98,4 +103,10 @@ else
 fi
 
 docker compose up -d prestashop-run
+
+if [ $? -ne 0 ]; then
+  echo "Docker compose command failed. Stopping process."
+  exit 1
+fi
+
 echo "--- Docker container created for test module environment, see result at http://localhost:8002/$ADMIN_DIR ---"

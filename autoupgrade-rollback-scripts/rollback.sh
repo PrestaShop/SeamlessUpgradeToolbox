@@ -157,10 +157,10 @@ create_DB_diff() {
 
 rollback() {
   echo "--- Start rollback ---"
-  rollback_dir=$(docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
+  backupName=$(docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
     bash -c "ls -td -- $ADMIN_DIR/autoupgrade/backup/*/ | head -n 1 | rev | cut -d'/' -f2 | rev | tr -d '\n'")
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-    php modules/autoupgrade/cli-rollback.php --dir="$ADMIN_DIR" --backup="$rollback_dir" >>"$LOGS_DIRECTORY"/"$BASE_VERSION"_rollback
+    php modules/autoupgrade/bin/console backup:restore --backup=$backupName $ADMIN_DIR >>"$LOGS_DIRECTORY"/"$BASE_VERSION"_rollback
   echo "--- Rollback done ---"
   echo ""
 }
@@ -218,6 +218,12 @@ compare_hashes_and_create_diff() {
 }
 
 docker compose up -d mysql
+
+if [ $? -ne 0 ]; then
+  echo "Docker compose command failed. Stopping process."
+  exit 1
+fi
+
 download_release "$BASE_VERSION"
 sleep 10
 create_DB_schema "$BASE_VERSION"
@@ -261,4 +267,10 @@ else
 fi
 
 docker compose up -d prestashop-run
+
+if [ $? -ne 0 ]; then
+  echo "Docker compose command failed. Stopping process."
+  exit 1
+fi
+
 echo "--- Docker container created for upgrade, see result at http://localhost:8002/$ADMIN_DIR ---"
