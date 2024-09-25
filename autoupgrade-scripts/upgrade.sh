@@ -87,13 +87,7 @@ upgrade_process() {
       }' > modules/autoupgrade/config.json"
 
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-    php modules/autoupgrade/cli-updateconfig.php --from=modules/autoupgrade/config.json --dir="$ADMIN_DIR" >"$LOGS_DIRECTORY"/"$2"_upgrade
-
-  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-    php modules/autoupgrade/cli-upgrade.php --dir="$ADMIN_DIR" --action="compareReleases" >>"$LOGS_DIRECTORY"/"$2"_upgrade
-
-  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-    php modules/autoupgrade/cli-upgrade.php --dir="$ADMIN_DIR" >>"$LOGS_DIRECTORY"/"$2"_upgrade
+    php modules/autoupgrade/bin/console update:start --config-file-path="modules/autoupgrade/config.json" $ADMIN_DIR >>"$LOGS_DIRECTORY"/"$2"_upgrade
 
   if [ ! $? -eq 0 ]; then
     echo "Upgrade from v$1 to v$2 fail, see" "$LOGS_DIRECTORY"/"$2"_upgrade
@@ -215,6 +209,12 @@ compare_hashes_and_create_diff() {
 }
 
 docker compose up -d mysql
+
+if [ $? -ne 0 ]; then
+  echo "Docker compose command failed. Stopping process."
+  exit 1
+fi
+
 download_release "$BASE_VERSION"
 sleep 10
 create_DB_schema "$BASE_VERSION"
@@ -276,4 +276,10 @@ mv "$RELEASE_DIRECTORY"/"$BASE_VERSION" "$RELEASE_DIRECTORY"/"$BASE_VERSION"_upg
 mv "$RELEASE_DIRECTORY"/"$BASE_VERSION"_upgraded/install "$RELEASE_DIRECTORY"/"$BASE_VERSION"_upgraded/install-dev
 
 docker compose up -d prestashop-run
+
+if [ $? -ne 0 ]; then
+  echo "Docker compose command failed. Stopping process."
+  exit 1
+fi
+
 echo "--- Docker container created for upgrade, see result at http://localhost:8002/$ADMIN_DIR ---"
