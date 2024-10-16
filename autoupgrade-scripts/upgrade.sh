@@ -71,8 +71,8 @@ upgrade_process() {
 
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
     sh -c "echo '{
-      \"channel\":\"archive\",
-      \"archive_prestashop\":\"prestashop_$2.zip\",
+      \"channel\":\"local\",
+      \"archive_zip\":\"prestashop_$2.zip\",
       \"archive_num\":\"$2\",
       \"archive_xml\":\"prestashop_$2.xml\",
       \"PS_AUTOUP_PERFORMANCE\":\"$PS_AUTOUP_PERFORMANCE\",
@@ -87,7 +87,7 @@ upgrade_process() {
       }' > modules/autoupgrade/config.json"
 
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-    php modules/autoupgrade/bin/console update:start --config-file-path="modules/autoupgrade/config.json" $ADMIN_DIR >>"$LOGS_DIRECTORY"/"$2"_upgrade
+    php modules/autoupgrade/bin/console update:start -v --config-file-path="modules/autoupgrade/config.json" $ADMIN_DIR >>"$LOGS_DIRECTORY"/"$2"_upgrade
 
   if [ ! $? -eq 0 ]; then
     echo "Upgrade from v$1 to v$2 fail, see" "$LOGS_DIRECTORY"/"$2"_upgrade

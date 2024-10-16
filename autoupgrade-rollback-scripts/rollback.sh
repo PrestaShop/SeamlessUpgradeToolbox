@@ -67,8 +67,8 @@ upgrade_process() {
 
   docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
     sh -c "echo '{
-      \"channel\":\"archive\",
-      \"archive_prestashop\":\"prestashop_$2.zip\",
+      \"channel\":\"local\",
+      \"archive_zip\":\"prestashop_$2.zip\",
       \"archive_num\":\"$2\",
       \"archive_xml\":\"prestashop_$2.xml\",
       \"PS_AUTOUP_PERFORMANCE\":\"$PS_AUTOUP_PERFORMANCE\",
