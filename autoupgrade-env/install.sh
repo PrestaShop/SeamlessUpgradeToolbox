@@ -76,6 +76,21 @@ build_dev_release() {
   echo ""
 }
 
+install_and_build_new_module_ui() {
+  echo "--- Install and build new module UI ---"
+  docker compose run --rm -v ./:/var/www/html/ -w /var/www/html/$RELEASE_DIRECTORY/$PRESTASHOP_VERSION/modules/autoupgrade/_dev work-base /bin/sh -c \
+    "npm i;
+     npm run vite:build;"
+
+  if [ ! $? -eq 0 ]; then
+    echo "Install and build new module UI fail"
+    exit 1
+  fi
+
+  echo "--- Install and build new module UI done ---"
+  echo ""
+}
+
 docker compose up -d mysql
 
 if [ $? -ne 0 ]; then
@@ -93,6 +108,7 @@ else
 fi
 
 install_module "$PRESTASHOP_VERSION"
+install_and_build_new_module_ui
 mv "$RELEASE_DIRECTORY"/"$PRESTASHOP_VERSION"/install "$RELEASE_DIRECTORY"/"$PRESTASHOP_VERSION"/install-dev
 
 if dpkg --compare-versions "$PRESTASHOP_VERSION" ge 9.0.0; then
