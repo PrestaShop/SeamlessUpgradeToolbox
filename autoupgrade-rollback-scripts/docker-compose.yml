@@ -30,4 +30,4 @@ services:
     composer:
         image: composer:latest
         volumes:
-            - ./:/var/www/html/
+            - ./:/app

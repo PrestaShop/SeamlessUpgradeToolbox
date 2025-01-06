@@ -31,7 +31,7 @@ fi
 #
 install() {
   echo "--- Installation of v$1 ---"
-  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$1" work-base php install/index_cli.php \
+  docker compose run -u "$DOCKER_USER_ID" --rm -v $(pwd):/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$1" work-base php install/index_cli.php \
     --step=all --db_server=mysql:3306 --db_name=prestashop --db_DOCKER_USER_ID=root --db_password="$MYSQL_ROOT_PASSWORD" --prefix=ps_ --db_clear=1 \
     --domain=localhost:8002 --firstname="Marc" --lastname="Beier" \
     --password="$BO_PASSWORD" --email="$BO_EMAIL" --language=en --country=us \
@@ -52,7 +52,7 @@ install() {
 #
 build_dev_release() {
   echo "--- Download v$1 Prestashop and build release ---"
-  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/$RELEASE_DIRECTORY work-base /bin/sh -c \
+  docker compose run -u "$DOCKER_USER_ID" --rm -v $(pwd):/var/www/html/ -w /var/www/html/$RELEASE_DIRECTORY work-base /bin/sh -c \
     "git clone --depth 1 https://github.com/PrestaShop/PrestaShop.git;
     cd PrestaShop;
     git checkout $PRESTASHOP_DEVELOPMENT_BRANCH;
@@ -78,7 +78,7 @@ build_dev_release() {
 
 install_and_build_new_module_ui() {
   echo "--- Install and build new module UI ---"
-  docker compose run --rm -v ./:/var/www/html/ -w /var/www/html/$RELEASE_DIRECTORY/$PRESTASHOP_VERSION/modules/autoupgrade/_dev work-base /bin/sh -c \
+  docker compose run --rm -v $(pwd):/var/www/html/ -w /var/www/html/$RELEASE_DIRECTORY/$PRESTASHOP_VERSION/modules/autoupgrade/_dev work-base /bin/sh -c \
     "npm i;
      npm run vite:build;"
 
@@ -108,7 +108,12 @@ else
 fi
 
 install_module "$PRESTASHOP_VERSION"
-install_and_build_new_module_ui
+
+if [[ "$BUILD_NEW_UI" == true ]]; then
+  install_and_build_new_module_ui
+fi
+
+
 mv "$RELEASE_DIRECTORY"/"$PRESTASHOP_VERSION"/install "$RELEASE_DIRECTORY"/"$PRESTASHOP_VERSION"/install-dev
 
 if dpkg --compare-versions "$PRESTASHOP_VERSION" ge 9.0.0; then

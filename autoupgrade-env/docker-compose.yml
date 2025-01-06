@@ -27,8 +27,8 @@ services:
         ports:
             - "8002:80"
         volumes:
-            - ./${RELEASE_DIRECTORY}/${PRESTASHOP_VERSION}:/var/www/html/
+            - ./${RELEASE_DIRECTORY:-release}/${PRESTASHOP_VERSION}:/var/www/html/
     composer:
         image: composer:latest
         volumes:
-            - ./:/var/www/html/
+            - ./:/app
