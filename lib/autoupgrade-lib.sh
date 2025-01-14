@@ -12,7 +12,7 @@ download_release() {
     echo "Cache detected ! skip download zip"
     cp "$CACHE_DIRECTORY"/"$1".zip "$RELEASE_DIRECTORY"/prestashop_"$1".zip
   else
-    docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY" work-base \
+    docker compose run -u "$DOCKER_USER_ID" --rm -v $(pwd):/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY" work-base \
       curl --fail -LO https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip
 
     if [ ! $? -eq 0 ]; then
@@ -22,7 +22,7 @@ download_release() {
     cp "$RELEASE_DIRECTORY"/prestashop_"$1".zip "$CACHE_DIRECTORY"/"$1".zip
   fi
 
-  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY" work-base /bin/sh -c \
+  docker compose run -u "$DOCKER_USER_ID" --rm -v $(pwd):/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY" work-base /bin/sh -c \
     "unzip -o prestashop_$1.zip -d $1 >/dev/null;
      rm prestashop_$1.zip;
      cd $1 || exit;
@@ -48,7 +48,7 @@ download_release_and_xml() {
     echo "Cache detected ! skip download zip"
     cp "$CACHE_DIRECTORY"/"$1".zip "$RELEASE_DIRECTORY"/"$BASE_VERSION"/"$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".zip
   else
-    docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
+    docker compose run -u "$DOCKER_USER_ID" --rm -v $(pwd):/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
       curl --fail -L https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip -o "$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".zip
 
     if [ ! $? -eq 0 ]; then
@@ -62,7 +62,7 @@ download_release_and_xml() {
     echo "Cache detected ! skip download xml"
     cp "$CACHE_DIRECTORY"/"$1".xml "$RELEASE_DIRECTORY"/"$BASE_VERSION"/"$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".xml
   else
-    docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
+    docker compose run -u "$DOCKER_USER_ID" --rm -v $(pwd):/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
       curl --fail -L https://api.prestashop.com/xml/md5/"$1".xml -o "$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".xml
 
     if [ ! $? -eq 0 ]; then
@@ -72,7 +72,7 @@ download_release_and_xml() {
     cp "$RELEASE_DIRECTORY"/"$BASE_VERSION"/"$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".xml "$CACHE_DIRECTORY"/"$1".xml
   fi
 
-  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY" work-base /bin/sh -c \
+  docker compose run -u "$DOCKER_USER_ID" --rm -v $(pwd):/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY" work-base /bin/sh -c \
     "cp $BASE_VERSION/"$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".zip .
     unzip -o prestashop_$1.zip -d $1 >/dev/null;
     rm prestashop_$1.zip;
@@ -94,7 +94,7 @@ download_release_and_xml() {
 #
 install_module() {
   echo "--- Install autoupgrade module (dev version) --- "
-  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$1" composer /bin/sh -c \
+  docker compose run -u "$DOCKER_USER_ID" --rm -w /app/"$RELEASE_DIRECTORY"/"$1" composer /bin/sh -c \
     "cd modules;
      git clone $AUTOUPGRADE_GIT_REPO;
      cd autoupgrade;
@@ -112,7 +112,7 @@ install_module() {
 
 # Clean modules, for development purpose only
 clean_modules() {
-  docker compose run -u "$DOCKER_USER_ID" --rm -v ./:/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base /bin/sh -c \
+  docker compose run -u "$DOCKER_USER_ID" --rm -v $(pwd):/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base /bin/sh -c \
     "cp -r modules/autoupgrade .;
     rm -rf modules/*;
     mv autoupgrade modules/;"
