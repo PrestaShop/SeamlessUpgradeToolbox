@@ -24,7 +24,8 @@ rm -rf ./"$DUMP_DIRECTORY"/*
 
 docker compose down --volumes --remove-orphans
 
-if dpkg --compare-versions "$BASE_VERSION" ge 9.0.0; then
+if dpkg --compare-versions "$BASE_VERSION" ge 8.1.0 || dpkg --compare-versions "$UPGRADE_VERSION" ge 9.0.0; then
+  echo "Forcing PHP 8.1 work base version"
   export PRESTASHOP_WORK_BASE_VERSION=8.1-fpm
   docker compose build work-base
 else
@@ -64,7 +65,8 @@ install() {
 upgrade_process() {
   echo "--- Upgrade from v$1 to v$2 ---"
 
-  if dpkg --compare-versions "$2" ge 9.0.0; then
+  if dpkg --compare-versions "$1" ge 8.1.0 || dpkg --compare-versions "$2" ge 9.0.0; then
+    echo "Forcing PHP 8.1 work base version"
     export PRESTASHOP_WORK_BASE_VERSION=8.1-fpm
     docker compose build work-base
   fi
@@ -261,7 +263,8 @@ if [[ "$CREATE_AND_COMPARE_FILES_WITH_FRESH_INSTALL" == true ]]; then
   compare_hashes_and_create_diff
 fi
 
-if dpkg --compare-versions "$UPGRADE_VERSION" ge 9.0.0; then
+if dpkg --compare-versions "$BASE_VERSION" ge 8.1.0 || dpkg --compare-versions "$UPGRADE_VERSION" ge 9.0.0; then
+  echo "Forcing PHP 8.1 run version"
   export PRESTASHOP_RUN_VERSION=8.1-apache
   docker compose build prestashop-run
 else
