@@ -23,6 +23,7 @@ rm -rf ./"$RELEASE_DIRECTORY"/*
 rm -rf ./"$DUMP_DIRECTORY"/*
 
 docker compose down --volumes --remove-orphans
+check_app_ports
 
 if dpkg --compare-versions "$BASE_VERSION" ge 9.0.0; then
   export PRESTASHOP_WORK_BASE_VERSION=8.1-fpm

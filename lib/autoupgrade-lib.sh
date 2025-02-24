@@ -152,3 +152,10 @@ upgrade_experimental() {
   build_dev_release "$2"
   upgrade_process "$1" "$2"
 }
+
+check_app_ports() {
+  if ss -tuln | grep -qE ":($PRESTASHOP_RUN_PORT|$MYSQL_PORT)"; then
+    echo "Port 3306 or 8002 is used, please free it for the script to work properly."
+    exit 1
+  fi
+}
