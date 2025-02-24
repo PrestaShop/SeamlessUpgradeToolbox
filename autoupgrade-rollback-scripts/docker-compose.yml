@@ -2,7 +2,7 @@ services:
     mysql:
         image: mysql:5.7
         ports:
-            - "3306:3306"
+            - ${MYSQL_PORT}:3306
         environment:
             MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
         restart: always
@@ -24,7 +24,7 @@ services:
         depends_on:
             - mysql
         ports:
-            - "8002:80"
+            - ${PRESTASHOP_RUN_PORT}:80
         volumes:
             - ./${RELEASE_DIRECTORY}/${BASE_VERSION}_rollback:/var/www/html/
     composer:

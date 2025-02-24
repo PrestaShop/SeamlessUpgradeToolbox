@@ -17,6 +17,7 @@ rm -rf ./"$RELEASE_DIRECTORY"/*
 rm -rf ./"$LOGS_DIRECTORY"/*
 
 docker compose down --volumes --remove-orphans
+check_app_ports
 
 if dpkg --compare-versions "$PRESTASHOP_VERSION" ge 9.0.0; then
   export PRESTASHOP_WORK_BASE_VERSION=8.1-fpm
@@ -78,7 +79,7 @@ build_dev_release() {
 
 install_and_build_new_module_ui() {
   echo "--- Install and build new module UI ---"
-  docker compose run --rm -v $(pwd):/var/www/html/ -w /var/www/html/$RELEASE_DIRECTORY/$PRESTASHOP_VERSION/modules/autoupgrade/_dev work-base /bin/sh -c \
+  docker compose run -u "$DOCKER_USER_ID" --rm -v $(pwd):/var/www/html/ -w /var/www/html/$RELEASE_DIRECTORY/$PRESTASHOP_VERSION/modules/autoupgrade/_dev work-base /bin/sh -c \
     "npm i;
      npm run vite:build;"
 
