@@ -144,13 +144,47 @@ dump_DB() {
 }
 
 # Params:
+#   $1 - Table name
+#   $2 - Prestashop version target for dump. ex: 8.0.5
+#
+dump_table() {
+  echo "--- Create table ps_$1 dump for $2 ---"
+  version="${2//./}"
+  docker compose run --rm mysql sh -c "exec mysqldump -hmysql -uroot -p$MYSQL_ROOT_PASSWORD --extended-insert=false --no-create-info --skip-add-drop-table --skip-add-locks --skip-comments --skip-disable-keys presta_$version ps_$1" >"$DUMP_DIRECTORY"/table_"$1"_dump_for_ps_"$2".sql
+  
+  # Remove ID
+  sed -E 's/VALUES \([0-9]+,/\VALUES (/g' "$DUMP_DIRECTORY/table_$1_dump_for_ps_$2.sql" >"$DUMP_DIRECTORY/table_$1_dump_for_ps_$2_temp.sql"
+  # Set date to 0000-00-00 00:00:00
+  sed -E -i 's/[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}/0000-00-00 00:00:00/g' "$DUMP_DIRECTORY/table_$1_dump_for_ps_$2_temp.sql"
+  # Remove comment
+  sed -E '/^\/\*![0-9]+/d' "$DUMP_DIRECTORY/table_$1_dump_for_ps_$2_temp.sql" >"$DUMP_DIRECTORY/table_$1_dump_for_ps_$2.sql"
+
+  rm "$DUMP_DIRECTORY/table_$1_dump_for_ps_$2_temp.sql"
+  sort "$DUMP_DIRECTORY/table_$1_dump_for_ps_$2.sql" -o "$DUMP_DIRECTORY/table_$1_dump_for_ps_$2.sql"
+  echo "--- Create table ps_$1 dump for $2 ---"
+  echo ""
+}
+
+# Params:
 #   $1 - Prestashop version. ex: 8.0.5
 #
 create_DB_diff() {
   echo "--- Create database diff between $BASE_VERSION and $1 ---"
-  docker compose run -u "$DOCKER_USER_ID" --rm -w /var/www/html/"$DUMP_DIRECTORY" composer \
-    git diff "$BASE_VERSION"_to_"$1"_dump_.sql "$1"_dump_.sql >"$DUMP_DIRECTORY"/diff_"$BASE_VERSION"_upgrated_"$1".txt
+  docker compose run -u "$DOCKER_USER_ID" --rm -w /app/"$DUMP_DIRECTORY" composer \
+    git diff "$BASE_VERSION"_to_"$1"_dump_.sql "$1"_dump_.sql >"$DUMP_DIRECTORY"/diff_"$BASE_VERSION"_upgrated_"$1".patch
   echo "--- Create database diff between $BASE_VERSION and $1 done ---"
+  echo ""
+}
+
+# Params:
+#   $1 - Table name
+#   $2 - Prestashop version target for dump. ex: 8.0.5
+#
+create_table_diff() {
+  echo "--- Create table $1 diff between $BASE_VERSION and $2 ---"
+  docker compose run -u "$DOCKER_USER_ID" --rm -w /app/"$DUMP_DIRECTORY" composer \
+    git diff --no-index --unified=0 table_"$1"_dump_for_ps_"$BASE_VERSION".sql table_"$1"_dump_for_ps_"$2".sql >"$DUMP_DIRECTORY"/diff_table_"$1".patch
+  echo "--- Create table $1 diff between $BASE_VERSION and $2 done ---"
   echo ""
 }
 
@@ -245,21 +279,42 @@ else
   fi
 fi
 
-if [[ "$CREATE_AND_COMPARE_DUMP_WITH_FRESH_INSTALL" == true ]]; then
-  dump_DB "$BASE_VERSION" "$UPGRADE_VERSION"
+if [[ "$CREATE_AND_COMPARE_DUMP_WITH_FRESH_INSTALL" == true || "$CREATE_AND_COMPARE_TABLE_DUMP_WITH_FRESH_INSTALL" == true ]]; then
+  if [[ "$CREATE_AND_COMPARE_DUMP_WITH_FRESH_INSTALL" == true ]]; then
+    dump_DB "$BASE_VERSION" "$UPGRADE_VERSION"
+  fi
+
+  if [[ "$CREATE_AND_COMPARE_TABLE_DUMP_WITH_FRESH_INSTALL" == true ]]; then
+    IFS=',' read -ra TABLES <<<"$TABLES_TO_DUMP_AND_COMPARE"
+    for table in "${TABLES[@]}"; do
+      dump_table "$table" "$BASE_VERSION"
+    done
+  fi
+
   create_DB_schema "$UPGRADE_VERSION"
   install "$UPGRADE_VERSION"
-  dump_DB "$UPGRADE_VERSION"
-  create_DB_diff "$UPGRADE_VERSION"
-  echo "--- Diff file create, see $DUMP_DIRECTORY/diff_${BASE_VERSION}_upgrated_${UPGRADE_VERSION}.txt ---"
+
+  if [[ "$CREATE_AND_COMPARE_DUMP_WITH_FRESH_INSTALL" == true ]]; then
+    dump_DB "$UPGRADE_VERSION"
+    create_DB_diff "$UPGRADE_VERSION"
+    echo "--- Diff file create, see $DUMP_DIRECTORY/diff_${BASE_VERSION}_upgrated_${UPGRADE_VERSION}.txt ---"
+  fi
+
+  if [[ "$CREATE_AND_COMPARE_TABLE_DUMP_WITH_FRESH_INSTALL" == true ]]; then
+    IFS=',' read -ra TABLES <<<"$TABLES_TO_DUMP_AND_COMPARE"
+    for table in "${TABLES[@]}"; do
+      dump_table "$table" "$UPGRADE_VERSION"
+      create_table_diff "$table" "$UPGRADE_VERSION"
+    done
+  fi
 fi
 
 if [[ "$CREATE_AND_COMPARE_FILES_WITH_FRESH_INSTALL" == true ]]; then
   create_md5_hashes "$BASE_VERSION"
-  if [[ "$CREATE_AND_COMPARE_DUMP_WITH_FRESH_INSTALL" != true ]]; then
+  if [[ "$CREATE_AND_COMPARE_DUMP_WITH_FRESH_INSTALL" != true && "$CREATE_AND_COMPARE_TABLE_DUMP_WITH_FRESH_INSTALL" == true ]]; then
     install "$UPGRADE_VERSION"
   fi
-  mv $RELEASE_DIRECTORY/$UPGRADE_VERSION/admin $RELEASE_DIRECTORY/$UPGRADE_VERSION/$ADMIN_DIR;
+  mv $RELEASE_DIRECTORY/"$UPGRADE_VERSION"/admin $RELEASE_DIRECTORY/"$UPGRADE_VERSION"/"$ADMIN_DIR"
   create_md5_hashes "$UPGRADE_VERSION"
   compare_hashes_and_create_diff
 fi
