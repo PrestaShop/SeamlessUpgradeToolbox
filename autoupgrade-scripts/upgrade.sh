@@ -45,7 +45,7 @@ install() {
   else
     presta_step=all
   fi
-  docker compose run -u "$DOCKER_USER_ID" --rm -v $(pwd):/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$1" work-base php install/index_cli.php \
+  docker compose run -u "$DOCKER_USER_ID" --rm -v "$(pwd)":/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$1" work-base php install/index_cli.php \
     --step="$presta_step" --db_server=mysql:3306 --db_name=presta_"$db_version" --db_DOCKER_USER_ID=root --db_password="$MYSQL_ROOT_PASSWORD" --prefix=ps_ --db_clear=1 \
     --domain=localhost:8002 --firstname="Marc" --lastname="Beier" \
     --password="$BO_PASSWORD" --email="$BO_EMAIL" --language=en --country=us \
@@ -72,7 +72,7 @@ upgrade_process() {
     docker compose build work-base
   fi
 
-  docker compose run -u "$DOCKER_USER_ID" --rm -v $(pwd):/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
+  docker compose run -u "$DOCKER_USER_ID" --rm -v "$(pwd)":/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
     sh -c "echo '{
       \"channel\":\"local\",
       \"archive_zip\":\"prestashop_$2.zip\",
@@ -84,7 +84,7 @@ upgrade_process() {
       \"PS_DISABLE_OVERRIDES\":\"$PS_DISABLE_OVERRIDES\"
       }' > modules/autoupgrade/config.json"
 
-  docker compose run -u "$DOCKER_USER_ID" --rm -v $(pwd):/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
+  docker compose run -u "$DOCKER_USER_ID" --rm -v "$(pwd)":/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
     php modules/autoupgrade/bin/console update:start -v --config-file-path="modules/autoupgrade/config.json" $ADMIN_DIR >>"$LOGS_DIRECTORY"/"$2"_upgrade
 
   if [ ! $? -eq 0 ]; then
@@ -102,7 +102,7 @@ upgrade_process() {
 #
 build_dev_release() {
   echo "--- Download v$1 Prestashop and build release ---"
-  docker compose run -u "$DOCKER_USER_ID" --rm -v $(pwd):/var/www/html/ -w /var/www/html/releases work-base /bin/sh -c \
+  docker compose run -u "$DOCKER_USER_ID" --rm -v "$(pwd)":/var/www/html/ -w /var/www/html/releases work-base /bin/sh -c \
     "git clone https://github.com/PrestaShop/PrestaShop.git;
     cd PrestaShop;
     git checkout $UPGRADE_DEVELOPMENT_BRANCH;
