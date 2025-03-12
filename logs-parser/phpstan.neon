@@ -1,0 +1,8 @@
+parameters:
+  paths:
+    - ./
+  excludePaths:
+    analyse:
+      - vendor/
+  reportUnmatchedIgnoredErrors: false
+  level: max
