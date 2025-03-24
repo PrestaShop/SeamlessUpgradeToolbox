@@ -123,13 +123,13 @@ build_dev_release() {
 
 # Params:
 #   $1 - Prestashop version target for dump. ex: 8.0.5
-#   $2 - If set, specify destination version in dump filename. ex: 8.1.7
+#   $2 - If dump is done after rollback
 #
 dump_DB() {
   echo "--- Create dump for $1 ---"
   version="${1//./}"
   if [[ -n "$2" ]]; then
-    docker compose run --rm mysql sh -c "exec mysqldump -hmysql -uroot --no-data --compact -p$MYSQL_ROOT_PASSWORD presta_$version" | sed 's/ AUTO_INCREMENT=[0-9]*\b//g' >"$DUMP_DIRECTORY"/"$2"_to_"$1"_dump_.sql
+    docker compose run --rm mysql sh -c "exec mysqldump -hmysql -uroot --no-data --compact -p$MYSQL_ROOT_PASSWORD presta_$version" | sed 's/ AUTO_INCREMENT=[0-9]*\b//g' >"$DUMP_DIRECTORY"/"$1"_"$2"_dump_.sql
   else
     docker compose run --rm mysql sh -c "exec mysqldump -hmysql -uroot --no-data --compact -p$MYSQL_ROOT_PASSWORD presta_$version" | sed 's/ AUTO_INCREMENT=[0-9]*\b//g' >"$DUMP_DIRECTORY"/"$1"_dump_.sql
   fi
@@ -143,7 +143,7 @@ dump_DB() {
 create_DB_diff() {
   echo "--- Create database diff between $BASE_VERSION and $BASE_VERSION with rollback ---"
   docker compose run -u "$DOCKER_USER_ID" --rm -v $(pwd):/var/www/html/ -w /var/www/html/"$DUMP_DIRECTORY" composer \
-    git diff "$UPGRADE_VERSION"_to_"$BASE_VERSION"_dump_.sql "$BASE_VERSION"_dump_.sql >"$DUMP_DIRECTORY"/diff_"$UPGRADE_VERSION"_rollback_"$BASE_VERSION".txt
+    git diff "$BASE_VERSION"_after_rollback_dump_.sql "$BASE_VERSION"_dump_.sql >"$DUMP_DIRECTORY"/diff_"$UPGRADE_VERSION"_rollback_"$BASE_VERSION".txt
   echo "--- Create database diff done ---"
   echo ""
 }
@@ -240,7 +240,7 @@ fi
 rollback
 
 if [[ "$CREATE_AND_COMPARE_DUMP_WITH_FRESH_INSTALL" == true ]]; then
-  dump_DB "$BASE_VERSION" "$UPGRADE_VERSION"
+  dump_DB "$BASE_VERSION" "after_rollback"
   create_DB_diff
 fi
 
