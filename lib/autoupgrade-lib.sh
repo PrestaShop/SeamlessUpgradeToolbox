@@ -73,7 +73,7 @@ download_release_and_xml() {
   fi
 
   docker compose run -u "$DOCKER_USER_ID" --rm -v "$(pwd)":/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY" work-base /bin/sh -c \
-    "cp $BASE_VERSION/"$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".zip .
+    "cp $BASE_VERSION/$ADMIN_DIR/autoupgrade/download/prestashop_$1.zip .
     unzip -o prestashop_$1.zip -d $1 >/dev/null;
     rm prestashop_$1.zip;
     cd $1 || exit;
