@@ -78,9 +78,7 @@ upgrade_process() {
       \"archive_zip\":\"prestashop_$2.zip\",
       \"archive_xml\":\"prestashop_$2.xml\",
       \"PS_AUTOUP_CUSTOM_MOD_DESACT\":\"$PS_AUTOUP_CUSTOM_MOD_DESACT\",
-      \"PS_AUTOUP_CHANGE_DEFAULT_THEME\":\"$PS_AUTOUP_CHANGE_DEFAULT_THEME\",
-      \"PS_AUTOUP_KEEP_MAILS\":\"$PS_AUTOUP_KEEP_MAILS\",
-      \"PS_AUTOUP_KEEP_IMAGES\":\"$PS_AUTOUP_KEEP_IMAGES\",
+      \"PS_AUTOUP_REGEN_EMAIL\":\"$PS_AUTOUP_REGEN_EMAIL\",
       \"PS_DISABLE_OVERRIDES\":\"$PS_DISABLE_OVERRIDES\"
       }' > modules/autoupgrade/config.json"
 
@@ -151,7 +149,7 @@ dump_table() {
   echo "--- Create table ps_$1 dump for $2 ---"
   version="${2//./}"
   docker compose run --rm mysql sh -c "exec mysqldump -hmysql -uroot -p$MYSQL_ROOT_PASSWORD --extended-insert=false --no-create-info --skip-add-drop-table --skip-add-locks --skip-comments --skip-disable-keys presta_$version ps_$1" >"$DUMP_DIRECTORY"/table_"$1"_dump_for_ps_"$2".sql
-  
+
   # Remove ID
   sed -E 's/VALUES \([0-9]+,/\VALUES (/g' "$DUMP_DIRECTORY/table_$1_dump_for_ps_$2.sql" >"$DUMP_DIRECTORY/table_$1_dump_for_ps_$2_temp.sql"
   # Set date to 0000-00-00 00:00:00
@@ -185,6 +183,14 @@ create_table_diff() {
   docker compose run -u "$DOCKER_USER_ID" --rm -w /app/"$DUMP_DIRECTORY" composer \
     git diff --no-index --unified=0 table_"$1"_dump_for_ps_"$BASE_VERSION".sql table_"$1"_dump_for_ps_"$2".sql >"$DUMP_DIRECTORY"/diff_table_"$1".patch
   echo "--- Create table $1 diff between $BASE_VERSION and $2 done ---"
+  echo ""
+}
+
+create_backup() {
+  echo "--- Create backup ---"
+  docker compose run -u "$DOCKER_USER_ID" --rm -v "$(pwd)":/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
+    php modules/autoupgrade/bin/console backup:create --include-images="$PS_AUTOUP_KEEP_IMAGES" "$ADMIN_DIR" >>"$LOGS_DIRECTORY"/"$BASE_VERSION"_backup
+  echo "--- Create backup done ---"
   echo ""
 }
 
@@ -253,30 +259,14 @@ create_DB_schema "$BASE_VERSION"
 install "$BASE_VERSION"
 install_module "$BASE_VERSION"
 
-if [[ "$RECURSIVE_MODE" == true ]]; then
-  previousTag=$BASE_VERSION
+if [[ "$PS_AUTOUP_BACKUP" == true || "$PS_AUTOUP_BACKUP" == "1" ]]; then
+  create_backup
+fi
 
-  for tag in $(git ls-remote --tags --refs git@github.com:PrestaShop/PrestaShop.git | awk -F/ '{print $NF}'); do
-    if dpkg --compare-versions "$tag" gt "$BASE_VERSION" &&
-      dpkg --compare-versions "$tag" le "$UPGRADE_VERSION" &&
-      [[ "$tag" != *'beta'* && "$tag" != *'rc'* ]]; then
-
-      upgrade "$previousTag" "$tag"
-      previousTag=$tag
-    fi
-  done
-
-  if [[ "$UPGRADE_DEVELOPMENT_VERSION" == true && "$previousTag" != "$UPGRADE_VERSION" ]]; then
-    upgrade_experimental "$previousTag" "$UPGRADE_VERSION"
-  else
-    echo "Warning: The BUILD_DEVELOP tag has not been taken into account, the target version is already available in releases and the upgrade has been done"
-  fi
+if [[ "$UPGRADE_DEVELOPMENT_VERSION" == true ]]; then
+  upgrade_experimental "$BASE_VERSION" "$UPGRADE_VERSION"
 else
-  if [[ "$UPGRADE_DEVELOPMENT_VERSION" == true ]]; then
-    upgrade_experimental "$BASE_VERSION" "$UPGRADE_VERSION"
-  else
-    upgrade "$BASE_VERSION" "$UPGRADE_VERSION"
-  fi
+  upgrade "$BASE_VERSION" "$UPGRADE_VERSION"
 fi
 
 if [[ "$CREATE_AND_COMPARE_DUMP_WITH_FRESH_INSTALL" == true || "$CREATE_AND_COMPARE_TABLE_DUMP_WITH_FRESH_INSTALL" == true ]]; then

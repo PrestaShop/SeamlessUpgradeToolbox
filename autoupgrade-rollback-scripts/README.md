@@ -1,10 +1,14 @@
 # Utility script to quickly test the rollback process in autoupgrade module
 
 The script allows testing the rollback between 2 versions of PrestaShop, with the possibility of :
+
 - create a database dump before upgrade and comparing it with another dump created after the rollback
 - create file hashes before upgrade and comparing it with another hashes created after the rollback
 
 The entire process is containerized.
+
+> [!IMPORTANT]  
+> Work only for v7.0.0+ of autoupgrade module.
 
 ## Prerequisites
 
