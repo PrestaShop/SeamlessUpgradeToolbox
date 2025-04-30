@@ -16,6 +16,8 @@ services:
                 - NODE_VERSION=${NODE_VERSION}
                 - USER_ID=${DOCKER_USER_ID}
                 - GROUP_ID=${DOCKER_GROUP_ID}
+        volumes:
+            - ./override-php.ini:/usr/local/etc/php/conf.d/custom.ini
         depends_on:
             - mysql
     prestashop-run:
@@ -26,6 +28,7 @@ services:
         ports:
             - ${PRESTASHOP_RUN_PORT}:80
         volumes:
+            - ./override-php.ini:/usr/local/etc/php/conf.d/custom.ini
             - ./${RELEASE_DIRECTORY}/${BASE_VERSION}_upgraded:/var/www/html/
     composer:
         image: composer:latest
