@@ -1,5 +1,20 @@
 #!/bin/bash
 
+# Get release data from PrestaShop API
+# Params:
+#   $1 - release version. ex: 8.0.5
+#
+get_release_data() {
+  RELEASE_DATA=$(curl -s https://api.prestashop-project.org/prestashop | jq --arg VERSION "$1" '.[] | select(.version==$VERSION)')
+  if [ -z "$RELEASE_DATA" ]; then
+    echo "Version $1 not found in Distribution API." >&2
+    return 1
+  else
+    echo "Version $1 found in Distribution API." >&2
+    echo "$RELEASE_DATA"
+  fi
+}
+
 # Download ZIP for initial install.
 # The contents of the ZIP are copied to the releases folder under the version name
 # Params:
@@ -12,11 +27,17 @@ download_release() {
     echo "Cache detected ! skip download zip"
     cp "$CACHE_DIRECTORY"/"$1".zip "$RELEASE_DIRECTORY"/prestashop_"$1".zip
   else
+    RELEASE_DATA=$(get_release_data "$1")
+    if [ $? -ne 0 ]; then
+      exit 1
+    fi
+    ZIP_URL=$(echo "$RELEASE_DATA" | jq -r '.zip_download_url')
+
     docker compose run -u "$DOCKER_USER_ID" --rm -v "$(pwd)":/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY" work-base \
-      curl --fail -LO https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip
+      curl --fail -L "$ZIP_URL" -o prestashop_"$1".zip
 
     if [ ! $? -eq 0 ]; then
-      echo "Download v$1 Prestashop release zip fail, see" https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip
+      echo "Download v$1 Prestashop release zip fail, see $ZIP_URL"
       exit 1
     fi
     cp "$RELEASE_DIRECTORY"/prestashop_"$1".zip "$CACHE_DIRECTORY"/"$1".zip
@@ -26,9 +47,9 @@ download_release() {
     "unzip -o prestashop_$1.zip -d $1 >/dev/null;
      rm prestashop_$1.zip;
      cd $1 || exit;
-     unzip -o prestashop.zip >/dev/null;
-     rm prestashop.zip;
-     mkdir admin/autoupgrade/download;
+     unzip -o prestashop.zip >/dev/null; \
+     rm prestashop.zip; \
+     mkdir -p admin/autoupgrade/download;
      mv admin $ADMIN_DIR;
      cp -r ../$1 ../$1_base;"
 
@@ -44,15 +65,22 @@ download_release() {
 download_release_and_xml() {
   echo "--- Download v$1 Prestashop release and xml MD5 ---"
 
+  RELEASE_DATA=$(get_release_data "$1")
+  if [ $? -ne 0 ]; then
+    exit 1
+  fi
+  ZIP_URL=$(echo "$RELEASE_DATA" | jq -r '.zip_download_url')
+  XML_URL=$(echo "$RELEASE_DATA" | jq -r '.xml_download_url')
+
   if [ -e "$CACHE_DIRECTORY"/"$1".zip ]; then
     echo "Cache detected ! skip download zip"
     cp "$CACHE_DIRECTORY"/"$1".zip "$RELEASE_DIRECTORY"/"$BASE_VERSION"/"$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".zip
   else
     docker compose run -u "$DOCKER_USER_ID" --rm -v "$(pwd)":/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-      curl --fail -L https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip -o "$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".zip
+      curl --fail -L "$ZIP_URL" -o "$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".zip
 
     if [ ! $? -eq 0 ]; then
-      echo "Download v$1 Prestashop release zip fail, see" https://github.com/PrestaShop/zip-archives/raw/main/prestashop_"$1".zip
+      echo "Download v$1 Prestashop release zip fail, see $ZIP_URL"
       exit 1
     fi
     cp "$RELEASE_DIRECTORY"/"$BASE_VERSION"/"$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".zip "$CACHE_DIRECTORY"/"$1".zip
@@ -63,10 +91,10 @@ download_release_and_xml() {
     cp "$CACHE_DIRECTORY"/"$1".xml "$RELEASE_DIRECTORY"/"$BASE_VERSION"/"$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".xml
   else
     docker compose run -u "$DOCKER_USER_ID" --rm -v "$(pwd)":/var/www/html/ -w /var/www/html/"$RELEASE_DIRECTORY"/"$BASE_VERSION" work-base \
-      curl --fail -L https://api.prestashop.com/xml/md5/"$1".xml -o "$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".xml
+      curl --fail -L "$XML_URL" -o "$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".xml
 
     if [ ! $? -eq 0 ]; then
-      echo "Download v$1 Prestashop release xml fail, see" https://api.prestashop.com/xml/md5/"$1".xml
+      echo "Download v$1 Prestashop release xml fail, see $XML_URL"
       exit 1
     fi
     cp "$RELEASE_DIRECTORY"/"$BASE_VERSION"/"$ADMIN_DIR"/autoupgrade/download/prestashop_"$1".xml "$CACHE_DIRECTORY"/"$1".xml
@@ -77,8 +105,8 @@ download_release_and_xml() {
     unzip -o prestashop_$1.zip -d $1 >/dev/null;
     rm prestashop_$1.zip;
     cd $1 || exit;
-    unzip -o prestashop.zip >/dev/null;
-    rm prestashop.zip;"
+    unzip -o prestashop.zip >/dev/null; 
+    rm prestashop.zip; "
 
   if [ ! $? -eq 0 ]; then
     echo "Unzip v$1 Prestashop release fail"
