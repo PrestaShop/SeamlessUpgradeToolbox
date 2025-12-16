@@ -105,8 +105,8 @@ download_release_and_xml() {
     unzip -o prestashop_$1.zip -d $1 >/dev/null;
     rm prestashop_$1.zip;
     cd $1 || exit;
-    unzip -o prestashop.zip >/dev/null; \
-    rm prestashop.zip; \
+    unzip -o prestashop.zip >/dev/null; 
+    rm prestashop.zip; "
 
   if [ ! $? -eq 0 ]; then
     echo "Unzip v$1 Prestashop release fail"
