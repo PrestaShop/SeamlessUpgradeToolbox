@@ -6,7 +6,6 @@ services:
         environment:
             MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
             MYSQL_DATABASE: prestashop
-        restart: always
     work-base:
         image: autoupgrade-env-work-base:${PRESTASHOP_WORK_BASE_VERSION}
         build:

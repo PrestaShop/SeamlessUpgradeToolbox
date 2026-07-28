@@ -5,7 +5,6 @@ services:
             - ${MYSQL_PORT}:3306
         environment:
             MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-        restart: always
     work-base:
         image: autoupgrade-scripts-work-base:${PRESTASHOP_WORK_BASE_VERSION}
         build:
